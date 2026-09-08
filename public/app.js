@@ -641,6 +641,9 @@ function adopt({ mine, extra }) {
   $('#news').hidden = true;
   notes.clear();
   bodies.clear();
+  // Statuses live on the list, not the task, so a status added or recoloured in ClickUp
+  // is invisible until this is dropped. One refetch per list, on the next task opened.
+  lists.clear();
   if (!byId(picked)) {
     const order = [...mine].sort(byUrgency);
     picked = (order.find((t) => t.status.type === 'custom') ?? order[0])?.id ?? null;
@@ -662,10 +665,28 @@ async function poll() {
   const all = [fresh.mine, ...fresh.extra.map(([, l]) => l)].flat();
   const changed = all.filter((t) => seen.get(t.id) !== t.date_updated).length;
   const gone = everything().filter((t) => !all.some((f) => f.id === t.id)).length;
-  if (!(changed + gone)) return;
+  const restyled = await statusesMoved();
+  if (!(changed + gone + restyled)) return;
   fresher = fresh;
-  $('#news').textContent = `${changed + gone} changed`;
+  $('#news').textContent = `${changed + gone + restyled} changed`;
   $('#news').hidden = false;
+}
+
+/* The open task's own list, checked once a cycle. A status added, renamed or recoloured
+   in ClickUp changes the chips you would click, and nothing in the task payload reveals
+   it. Costs one request per poll, and only while a task is open. */
+async function statusesMoved() {
+  const id = ctx?.task?.list?.id;
+  if (!id || !lists.has(id)) return 0;
+  const shape = (l) => l.statuses.map((x) => `${x.status}:${x.color}:${x.type}`).join('|');
+  try {
+    const [had, now] = await Promise.all([lists.get(id), api(`/list/${id}`)]);
+    if (shape(had) === shape(now)) return 0;
+    lists.delete(id);   // next render refetches, and stops this counting twice
+    return 1;
+  } catch {
+    return 0;
+  }
 }
 
 const tick = () => readTimer().catch(() => {});

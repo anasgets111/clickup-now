@@ -47,8 +47,11 @@ priority and due date, tick subtasks off, attach files, post an update, start a 
   before being re-escaped for display. Status names sent *back* to the API stay raw.
 - The markdown renderer escapes everything before applying a single rule, so raw HTML in a
   description shows as text and cannot execute. That is why there's no sanitiser dependency.
-- Rate limit is 100 requests/minute on your plan. Each pinned list costs one request per refresh
-  and per poll, so a dozen pins would need rethinking.
+- Statuses belong to the list, not the task, so nothing in a task payload reveals that one was
+  added or recoloured. The 90s poll re-reads the open task's list to catch it, and a refresh drops
+  every cached list definition.
+- Rate limit is 100 requests/minute on your plan. A poll costs one request, plus one per pinned
+  list, plus one for the open task's list — so a dozen pins would need rethinking.
 
 ## Fiddling
 
