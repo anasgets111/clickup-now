@@ -241,15 +241,17 @@ function metaOf(t, full = false) {
   const where = t.folder && !t.folder.hidden ? `${t.folder.name}/${t.list.name}` : t.list.name;
   const p = t.priority && PRIOS.find((x) => x.name === t.priority.priority);
   const others = t.assignees.filter((a) => String(a.id) !== String(me.id));
+  const moved = Date.now() - Number(t.date_updated) < 864e5;
   return `<span class="meta">
     <span class="st">${txt(low(t.status.status))}</span>
-    <span>${txt(where)}</span>
-    ${t.due_date ? `<span class="${late ? 'late' : ''}">${esc(due(t.due_date))}</span>` : ''}
+    <span class="where">${txt(where)}</span>
+    ${t.due_date ? `<span class="${late ? 'late' : 'when'}">${esc(due(t.due_date))}</span>` : ''}
     ${p && p.id < 3 ? `<span class="prio" style="--p:${p.c}">&#9873; ${p.name}</span>` : ''}
     ${blockedBy(t) ? '<span class="stuck">blocked</span>' : ''}
-    ${full && t.time_estimate ? `<span>${Math.round(t.time_estimate / 36e5)}h est</span>` : ''}
-    ${full && others.length ? `<span>with ${others.map((a) => txt(a.username)).join(', ')}</span>` : ''}
-    ${full ? `<span>${esc(ago(t.date_updated))}</span>` : ''}
+    ${full && t.time_estimate ? `<span class="est">${Math.round(t.time_estimate / 36e5)}h est</span>` : ''}
+    ${full && others.length ? `<span>with ${others.map((a) =>
+      `<b class="who" style="--w:${snap(a.color)}">${txt(a.username)}</b>`).join(', ')}</span>` : ''}
+    ${full ? `<span class="${moved ? 'warm' : 'cold'}">${esc(ago(t.date_updated))}</span>` : ''}
     ${full ? t.tags.map((g) => `<span class="tag" style="background:${esc(g.tag_bg)};color:${esc(g.tag_fg)}">${txt(g.name)}</span>`).join('') : ''}
   </span>`;
 }

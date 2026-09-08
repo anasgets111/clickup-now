@@ -15,6 +15,8 @@
   --yellow: #f9e2af;
   --green: #a6e3a1;
   --sky: #89dceb;
+  --teal: #94e2d5;
+  --lavender: #b4befe;
 
   --c: var(--overlay1);
   /* One reading measure for the whole stage. It was set per element in ch, which
@@ -262,7 +264,7 @@ main {
 }
 #tick:hover { border-color: var(--green); color: var(--green); }
 #tick.go { border-color: var(--green); color: var(--crust); background: var(--green); }
-.spent { font: 400 12.5px var(--mono); color: var(--overlay1); }
+.spent { font: 400 12.5px var(--mono); color: var(--green); }
 
 .row-actions { display: flex; align-items: center; gap: 1.1rem; margin: 0 0 1.75rem; }
 .doc .row-actions { margin: 0; padding: 0.7rem 0 0.8rem; border-top: 1px solid var(--surface0); }
@@ -366,9 +368,18 @@ main {
   font-variant-numeric: tabular-nums;
 }
 
+/* Every part of this line says a different kind of thing, so each gets its own colour
+   rather than the whole run being tinted. Location is always lavender, a person is
+   always their own ClickUp colour, time spent is the same green as the running timer. */
 .meta .st { color: var(--c); }
+.meta .where { color: var(--lavender); }
 .meta .late { color: var(--red); }
+.meta .when { color: var(--sky); }
 .meta .prio { color: var(--p); }
+.meta .est { color: var(--teal); }
+.meta .who { font-weight: 400; color: var(--w); }
+.meta .warm { color: var(--subtext0); }   /* moved today */
+.meta .cold { color: var(--overlay1); }   /* sat a while */
 
 /* Blocked is a state you should be able to read without opening anything, so it gets
    a colour of its own rather than another grey word in the meta line. */
