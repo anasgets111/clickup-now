@@ -230,12 +230,12 @@ function renderRail() {
     { label: 'in flight', list: mine.filter((t) => t.status.type === 'custom') },
     { label: q ? 'matching' : 'mine', list: mine.filter((t) => t.status.type !== 'custom') },
   ];
+  const already = new Set(mine.map((t) => t.id));
   for (const p of pins) {
-    const seenIds = new Set(mine.map((t) => t.id));
     groups.push({
       label: unent(p.name),
       pin: p.id,
-      list: (pool.get(p.id) ?? []).filter((t) => !seenIds.has(t.id) && hit(t)).sort(byUrgency),
+      list: (pool.get(p.id) ?? []).filter((t) => !already.has(t.id) && hit(t)).sort(byUrgency),
     });
   }
 
@@ -258,20 +258,18 @@ function stats() {
 
 /* ── stage ──────────────────────────────────────────────────────── */
 
-function listOf(id) {
-  if (!lists.has(id)) lists.set(id, api(`/list/${id}`));
-  return lists.get(id);
+// Caches hold the promise, not the result, so two callers racing the same id share
+// one request instead of firing two.
+function once(map, key, make) {
+  if (!map.has(key)) map.set(key, make());
+  return map.get(key);
 }
-function notesOf(id) {
-  if (!notes.has(id)) notes.set(id, api(`/task/${id}/comment`));
-  return notes.get(id);
-}
+
+const listOf = (id) => once(lists, id, () => api(`/list/${id}`));
+const notesOf = (id) => once(notes, id, () => api(`/task/${id}/comment`));
 // The list endpoint flattens markdown away — description and text_content come back
 // identical and stripped. markdown_description only exists on the single-task fetch.
-function bodyOf(id) {
-  if (!bodies.has(id)) bodies.set(id, api(`/task/${id}?include_markdown_description=true&include_subtasks=true`));
-  return bodies.get(id);
-}
+const bodyOf = (id) => once(bodies, id, () => api(`/task/${id}?include_markdown_description=true&include_subtasks=true`));
 
 async function patch(task, body) {
   await api(`/task/${task.id}`, { method: 'PUT', body: JSON.stringify(body) });
@@ -301,6 +299,7 @@ async function renderStage() {
   const shutStatus = list.statuses.find((s) => s.type === 'done') ?? list.statuses.at(-1);
   const openStatus = list.statuses.find((s) => s.type === 'open') ?? list.statuses[0];
   const files = full.attachments ?? [];
+  const src = full.markdown_description ?? '';
   const running = timer?.task?.id === task.id;
 
   // Local date parts, not toISOString — that shifts to UTC and can show the wrong day.
@@ -327,7 +326,7 @@ async function renderStage() {
         aria-current="${!task.priority}">none</button></div>
 
     <div class="field"><em>due</em>
-      <input type="date" data-do="due" value="${dueVal}">
+      <input type="date" value="${dueVal}">
       <button class="chip" data-do="due" data-v="today" style="--c:var(--overlay1)">today</button>
       <button class="chip" data-do="due" data-v="" style="--c:var(--surface1)" ${dueVal ? '' : 'disabled'}>clear</button>
     </div>
@@ -358,8 +357,8 @@ async function renderStage() {
       <a class="link" href="${esc(task.url)}" target="_blank" rel="noreferrer">open in clickup</a>
     </div>`;
 
-  showBody(full.markdown_description ?? '');
-  ctx = { task, list, kids, shutStatus, openStatus, src: full.markdown_description ?? '' };
+  showBody(src);
+  ctx = { task, list, kids, shutStatus, openStatus, src };
 }
 
 /* Description: rendered by default, raw markdown when editing. Kept in one place so
@@ -389,8 +388,20 @@ function showBody(src, editing = false) {
    stack a new handler on #stage for every task opened, so one chip click would fire
    as many updates as tasks you had viewed. `ctx` carries what the open task needs. */
 
-const fail = (err, what) =>
+/* Shows a button as working, and puts its label back if the call fails — otherwise a
+   failed update leaves an ellipsis sitting there for good. */
+async function busy(b, run, what) {
+  const was = b.textContent;
+  b.textContent = '…';
+  b.disabled = true;
+  try { await run(); } catch (err) { fail(err, what); b.textContent = was; b.disabled = false; }
+}
+
+function fail(err, what) {
+  // One error line at a time; repeated failures used to pile up until the next render.
+  $('#stage .err')?.remove();
   $('#stage').insertAdjacentHTML('beforeend', `<p class="err">${esc(err.message)} &mdash; ${what}</p>`);
+}
 
 $('#stage').addEventListener('click', async (e) => {
   const b = e.target.closest('button');
@@ -399,30 +410,20 @@ $('#stage').addEventListener('click', async (e) => {
 
   if (b.classList.contains('edit')) return showBody(src, true);
   if (b.id === 'drop-edit') return showBody(src);
-  if (b.id === 'save') {
-    b.textContent = '…';
-    try { await patch(task, { markdown_content: $('.src').value }); } catch (err) { fail(err, 'description unchanged'); }
-    return;
-  }
+  if (b.id === 'save') return busy(b, () => patch(task, { markdown_content: $('.src').value }), 'description unchanged');
   if (b.classList.contains('more')) {
     const desc = $('.desc');
     desc.classList.toggle('all');
     b.textContent = desc.classList.contains('all') ? 'show less' : 'show all';
     return;
   }
-  if (b.id === 'tick') {
-    b.textContent = '…';
-    try { await toggleTimer(task); } catch (err) { fail(err, 'timer unchanged'); }
-    return;
-  }
+  if (b.id === 'tick') return busy(b, () => toggleTimer(task), 'timer unchanged');
   if (b.dataset.do && b.getAttribute('aria-current') !== 'true') {
-    b.textContent = '…';
-    try {
-      if (b.dataset.do === 'status') return await patch(task, { status: b.dataset.v });
-      if (b.dataset.do === 'priority') return await patch(task, { priority: b.dataset.v ? Number(b.dataset.v) : null });
-      const when = b.dataset.v === 'today' ? new Date().setHours(23, 59, 0, 0) : null;
-      await patch(task, { due_date: when, due_date_time: false });
-    } catch (err) { fail(err, 'nothing changed'); }
+    const { do: what, v } = b.dataset;
+    const body = what === 'status' ? { status: v }
+      : what === 'priority' ? { priority: v ? Number(v) : null }
+      : { due_date: v === 'today' ? new Date().setHours(23, 59, 0, 0) : null, due_date_time: false };
+    busy(b, () => patch(task, body), 'nothing changed');
   }
 });
 
@@ -519,9 +520,15 @@ async function toggleTimer(task) {
 
 function paintClock() {
   const el = $('#clock');
-  if (!timer) { el.hidden = true; return; }
-  el.hidden = false;
-  el.innerHTML = `<i>&#9678;</i>${clocked(Date.now() - Number(timer.start))} <b>${txt(timer.task?.name ?? 'running')}</b>`;
+  el.hidden = !timer;
+  if (!timer) return;
+  // Rebuild only when the entry changes; the elapsed time is a text node updated in
+  // place, so this does not re-parse HTML every second.
+  if (el.dataset.entry !== timer.id) {
+    el.dataset.entry = timer.id;
+    el.innerHTML = `<i>&#9678;</i><span class="elapsed"></span> <b>${txt(timer.task?.name ?? 'running')}</b>`;
+  }
+  $('.elapsed', el).textContent = clocked(Date.now() - Number(timer.start));
 }
 
 setInterval(() => timer && paintClock(), 1000);
