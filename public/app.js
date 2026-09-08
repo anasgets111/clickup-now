@@ -248,7 +248,7 @@ function metaOf(t, full = false) {
     ${p && p.id < 3 ? `<span class="prio" style="--p:${p.c}">&#9873; ${p.name}</span>` : ''}
     ${blockedBy(t) ? '<span class="stuck">blocked</span>' : ''}
     ${full && t.time_estimate ? `<span>${Math.round(t.time_estimate / 36e5)}h est</span>` : ''}
-    ${full && others.length ? `<span>with ${others.map((a) => txt(a.initials)).join(' ')}</span>` : ''}
+    ${full && others.length ? `<span>with ${others.map((a) => txt(a.username)).join(', ')}</span>` : ''}
     ${full ? `<span>${esc(ago(t.date_updated))}</span>` : ''}
     ${full ? t.tags.map((g) => `<span class="tag" style="background:${esc(g.tag_bg)};color:${esc(g.tag_fg)}">${txt(g.name)}</span>`).join('') : ''}
   </span>`;
