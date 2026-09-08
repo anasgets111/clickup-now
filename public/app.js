@@ -233,7 +233,7 @@ function renderRail() {
   const already = new Set(mine.map((t) => t.id));
   for (const p of pins) {
     groups.push({
-      label: unent(p.name),
+      label: p.name,
       pin: p.id,
       list: (pool.get(p.id) ?? []).filter((t) => !already.has(t.id) && hit(t)).sort(byUrgency),
     });
@@ -251,7 +251,7 @@ function stats() {
   const late = tasks.filter((t) => t.due_date && Number(t.due_date) < Date.now()).length;
   const today = tasks.filter((t) => t.due_date && daysOut(t.due_date) === 0).length;
   $('#stats').innerHTML = `
-    <span class="on"><i>&#9679;</i>${tasks.length} open</span>
+    <span class="on"><i>&#9679;</i>${tasks.filter((t) => !shut(t)).length} open</span>
     <span class="${late ? 'late' : ''}"><i>&#9650;</i>${late} late</span>
     <span><i>&#9678;</i>${today} today</span>`;
 }
@@ -561,12 +561,18 @@ $('#picker').addEventListener('click', async (e) => {
   if (s) {
     $$('[data-space]', $('#picker')).forEach((b) => b.setAttribute('aria-current', b === s));
     found.innerHTML = '<p class="label">loading lists</p>';
-    // Two calls per space: lists sitting in folders, and lists sitting loose in the space.
-    const [{ folders }, { lists: loose }] = await Promise.all([
-      api(`/space/${s.dataset.space}/folder`),
-      api(`/space/${s.dataset.space}/list`),
-    ]);
-    const all = [...folders.flatMap((f) => f.lists.map((x) => ({ ...x, under: f.name }))), ...loose];
+    let all;
+    try {
+      // Two calls per space: lists sitting in folders, and lists sitting loose in the space.
+      const [{ folders }, { lists: loose }] = await Promise.all([
+        api(`/space/${s.dataset.space}/folder`),
+        api(`/space/${s.dataset.space}/list`),
+      ]);
+      all = [...folders.flatMap((f) => f.lists.map((x) => ({ ...x, under: f.name }))), ...loose];
+    } catch (err) {
+      found.innerHTML = `<p class="err">${esc(err.message)}</p>`;
+      return;
+    }
     found.innerHTML = all.length
       ? `<div class="spaces">${all.map((x) => `<button class="chip" data-list="${esc(x.id)}"
           data-name="${txt(x.under ? `${x.under}/${x.name}` : x.name)}" style="--c:var(--mauve)"
@@ -580,7 +586,7 @@ $('#picker').addEventListener('click', async (e) => {
       : [...pins, { id, name: l.dataset.name }];
     localStorage.setItem('pins', JSON.stringify(pins));
     l.setAttribute('aria-current', pins.some((p) => p.id === id));
-    await reload();
+    reload();
   }
 });
 
@@ -618,9 +624,11 @@ async function pages(path, extra = {}) {
 async function fetchAll() {
   const q = new URLSearchParams({ order_by: 'due_date' });
   q.append('assignees[]', me.id);
-  const mine = await pages(`/team/${teamId}/task`, Object.fromEntries(q));
   // Top-level only for a pinned list: subtasks belong inside their parent, not as peers.
-  const extra = await Promise.all(pins.map(async (p) => [p.id, await pages(`/list/${p.id}/task`, { subtasks: 'false' })]));
+  const [mine, extra] = await Promise.all([
+    pages(`/team/${teamId}/task`, Object.fromEntries(q)),
+    Promise.all(pins.map(async (p) => [p.id, await pages(`/list/${p.id}/task`, { subtasks: 'false' })])),
+  ]);
   return { mine, extra };
 }
 
@@ -633,7 +641,10 @@ function adopt({ mine, extra }) {
   $('#news').hidden = true;
   notes.clear();
   bodies.clear();
-  if (!byId(picked)) picked = [...mine].sort(byUrgency).find((t) => t.status.type === 'custom')?.id ?? mine.sort(byUrgency)[0]?.id ?? null;
+  if (!byId(picked)) {
+    const order = [...mine].sort(byUrgency);
+    picked = (order.find((t) => t.status.type === 'custom') ?? order[0])?.id ?? null;
+  }
   stats();
   renderRail();
   renderStage();
@@ -657,8 +668,11 @@ async function poll() {
   $('#news').hidden = false;
 }
 
+const tick = () => readTimer().catch(() => {});
 setInterval(() => poll().catch(() => {}), 90_000);
-setInterval(() => readTimer().catch(() => {}), 60_000);
+setInterval(() => !document.hidden && tick(), 60_000);
+// Coming back to the tab is exactly when a stale clock would be visible.
+document.addEventListener('visibilitychange', () => !document.hidden && tick());
 $('#news').addEventListener('click', () => fresher && adopt(fresher));
 
 let typing;

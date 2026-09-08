@@ -12,8 +12,17 @@ if (!TOKEN) {
 
 const PUBLIC = resolve(fileURLToPath(new URL('./public', import.meta.url)));
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
+const OURS = ['http://localhost:4400', 'http://127.0.0.1:4400'];
 
 async function proxy(req, res) {
+  // This server holds a token that can change a whole company's workspace, and any
+  // page in the browser can reach 127.0.0.1. CORS stops such a page READING a reply,
+  // but a no-cors POST still fires — enough to stop a timer or post a comment. A
+  // cross-site request always carries its own Origin, so refuse those; same-origin
+  // ones either omit the header or send one of ours.
+  const from = req.headers.origin;
+  if (from && !OURS.includes(from)) return res.writeHead(403).end('{}');
+
   const chunks = [];
   for await (const c of req) chunks.push(c);
   // Pass the caller's content-type through rather than forcing JSON: file uploads are
@@ -30,7 +39,14 @@ async function proxy(req, res) {
 }
 
 createServer(async (req, res) => {
-  if (req.url.startsWith('/api/')) return proxy(req, res).catch(() => res.writeHead(502).end('{}'));
+  if (req.url.startsWith('/api/')) {
+    // headersSent guard: if the upstream body fails mid-read the status is already
+    // out, and a second writeHead would throw and take the server down.
+    return proxy(req, res).catch(() => {
+      if (!res.headersSent) res.writeHead(502, { 'content-type': 'application/json' });
+      res.end('{}');
+    });
+  }
   let path;
   try {
     path = decodeURIComponent(req.url.split('?')[0]);
