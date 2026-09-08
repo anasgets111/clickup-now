@@ -19,6 +19,11 @@
   --sky: #89dceb;
 
   --c: var(--overlay1);
+  /* One reading measure for the whole stage. It was set per element in ch, which
+     resolves to a different width in each because the font sizes differ — and never
+     on the container, so the surface stretched the full pane while its text stopped
+     at 62 characters. */
+  --read: 37rem;
   --sans: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
   --mono: 'JetBrains Mono', ui-monospace, monospace;
   color-scheme: dark;
@@ -245,6 +250,7 @@ main {
 .src {
   display: block;
   width: 100%;
+  max-width: var(--read);
   min-height: 12rem;
   margin-bottom: 0.75rem;
   padding: 0.9rem 1rem;
@@ -351,6 +357,7 @@ main {
    stopped mid-sentence against the page background. */
 .doc {
   margin: 0 0 1.75rem;
+  max-width: var(--read);
   padding: 1.15rem 1.35rem 0;
   background: var(--mantle);
   border-radius: 10px;
@@ -382,7 +389,6 @@ main {
 
 .desc > :first-child { margin-top: 0; }
 .desc > :last-child { margin-bottom: 0; }
-.desc p, .desc ul, .desc ol, .desc blockquote { max-width: 62ch; }
 .desc p { margin: 0 0 0.75rem; }
 
 .desc h2, .desc h3, .desc h4, .desc h5, .desc h6 {
@@ -496,7 +502,7 @@ main {
 
 /* ── subtasks ───────────────────────────────────────────── */
 
-.kids { margin: 1.25rem 0 0.5rem; max-width: 62ch; }
+.kids { margin: 1.25rem 0 0.5rem; max-width: var(--read); }
 .kids > em { font: 400 11px var(--mono); font-style: normal; color: var(--overlay1); }
 .kids ul { list-style: none; margin: 0.5rem 0 0; padding: 0; }
 
@@ -514,12 +520,12 @@ main {
 .kids li:has(input:checked) a { color: var(--overlay0); text-decoration: line-through; }
 .kids .st { margin-left: auto; font: 400 10.5px var(--mono); color: var(--c); white-space: nowrap; }
 
-.notes { list-style: none; margin: 1.25rem 0 0.9rem; padding: 0; max-width: 62ch; }
+.notes { list-style: none; margin: 1.25rem 0 0.9rem; padding: 0; max-width: var(--read); }
 .notes li { margin-bottom: 0.8rem; font-size: 0.88rem; }
 .notes em { font: 400 10.5px var(--mono); font-style: normal; color: var(--overlay1); }
 .notes p { margin: 0.15rem 0 0; color: var(--subtext0); white-space: pre-wrap; }
 
-.say { display: flex; gap: 0.5rem; max-width: 62ch; }
+.say { display: flex; gap: 0.5rem; max-width: var(--read); }
 .say input {
   flex: 1;
   height: 30px;
