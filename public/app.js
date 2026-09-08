@@ -362,7 +362,7 @@ async function renderStage() {
   stage.innerHTML = `
     <div class="col">
       <textarea id="title" rows="1" spellcheck="false" aria-label="Task name">${txt(task.name)}</textarea>
-      <div class="crumb">${metaOf(task, true)}
+      <div class="crumb" style="--c:${snap(task.status.color)}">${metaOf(task, true)}
         <button id="tick" class="${running ? 'go' : ''}">${running ? 'stop' : 'start'} timer</button>
         ${full.time_spent ? `<span class="spent">${clocked(full.time_spent)} logged</span>` : ''}
       </div>

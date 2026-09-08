@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
-
 /* Catppuccin Mocha */
 :root {
   --crust: #11111b;
@@ -148,7 +146,7 @@ main {
 
 /* Two panes once there is room: the list stays put on the left while the open task
    fills the right, so choosing never costs you your place. */
-@media (min-width: 1080px) {
+@media (min-width: 1180px) {
   main { grid-template-columns: 22rem minmax(0, 1fr); gap: 3rem; align-items: start; }
   #rail { position: sticky; top: 5.5rem; max-height: calc(100vh - 8rem); overflow-y: auto; }
 }
@@ -246,7 +244,11 @@ main {
 #title:hover { background: var(--mantle); }
 #title:focus { background: var(--mantle); outline: none; box-shadow: inset 0 0 0 1px var(--surface0); }
 
+/* The row sets --c inline from the task's status; the crumb never did, so the status
+   word fell back to the root grey and the whole line read as one flat tone. */
 .crumb { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.75rem; }
+.crumb .meta { gap: 1rem; font-size: 13px; }
+.crumb .st { font-weight: 500; }
 .crumb .meta { margin-top: 0; }
 
 #tick {

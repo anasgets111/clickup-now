@@ -4,21 +4,23 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Now</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <header id="bar">
-  <span class="ident"><i class="pip"></i><b id="who">&hellip;</b></span>
+  <span class="ident"><i class="pip" aria-hidden="true"></i><b id="who">&hellip;</b></span>
   <span class="stats" id="stats"></span>
   <button id="clock" hidden></button>
   <span class="tools">
     <button id="news" hidden></button>
     <button id="pin" title="Show another list">+ list</button>
-    <input id="q" type="search" placeholder="filter" autocomplete="off" spellcheck="false">
+    <input id="q" type="search" placeholder="filter" aria-label="Filter tasks" autocomplete="off" spellcheck="false">
     <label class="toggle"><input type="checkbox" id="watch"><span>watching</span></label>
     <label class="toggle"><input type="checkbox" id="closed"><span>closed</span></label>
-    <button id="refresh" title="Refresh">&#8635;</button>
+    <button id="refresh" title="Refresh" aria-label="Refresh">&#8635;</button>
   </span>
 </header>
 
