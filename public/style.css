@@ -23,7 +23,7 @@
      resolves to a different width in each because the font sizes differ — and never
      on the container, so the surface stretched the full pane while its text stopped
      at 62 characters. */
-  --read: 37rem;
+  --read: 42rem;
   --sans: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
   --mono: 'JetBrains Mono', ui-monospace, monospace;
   color-scheme: dark;
@@ -35,7 +35,7 @@ body {
   margin: 0;
   background: var(--crust);
   color: var(--text);
-  font: 400 15px/1.5 var(--sans);
+  font: 400 16px/1.5 var(--sans);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -55,7 +55,7 @@ body {
   background: color-mix(in srgb, var(--crust) 88%, transparent);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--mantle);
-  font: 400 12px/1 var(--mono);
+  font: 400 13px/1 var(--mono);
   color: var(--overlay1);
 }
 
@@ -130,7 +130,7 @@ body {
   border: 0;
   border-radius: 5px;
   color: var(--overlay1);
-  font-size: 15px;
+  font-size: 16px;
   cursor: pointer;
 }
 #refresh:hover { background: var(--mantle); color: var(--text); }
@@ -141,30 +141,55 @@ main {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 2.5rem;
-  max-width: 96rem;
+  max-width: 95rem;
   margin: 0 auto;
-  padding: 2.5rem 1.5rem 8rem;
+  padding: 2.5rem 2rem 8rem;
 }
 
 /* Two panes once there is room: the list stays put on the left while the open task
    fills the right, so choosing never costs you your place. */
 @media (min-width: 1080px) {
-  main { grid-template-columns: 24rem minmax(0, 1fr); gap: 3.5rem; align-items: start; }
+  main { grid-template-columns: 22rem minmax(0, 1fr); gap: 3rem; align-items: start; }
   #rail { position: sticky; top: 5.5rem; max-height: calc(100vh - 8rem); overflow-y: auto; }
 }
 
 #rail { scrollbar-width: thin; scrollbar-color: var(--surface0) transparent; }
+
+/* The stage was one measure-wide column with the rest of the pane left empty. Widening
+   the text would have pushed lines past a comfortable length, so the space goes to a
+   properties column instead — which also lifts the controls above a long subtask list
+   rather than burying them under it. */
+#stage { display: grid; gap: 2.5rem; }
+
+@media (min-width: 1400px) {
+  #stage {
+    grid-template-columns: minmax(0, var(--read)) minmax(14rem, 20rem);
+    gap: 3.5rem;
+    align-items: start;
+  }
+  .props { position: sticky; top: 5.5rem; }
+}
+
+.props { display: flex; flex-direction: column; gap: 1.5rem; }
+/* min-width:0 or a long code block in the description blows the column open and the
+   grid track grows with it. */
+.col { min-width: 0; }
+
+/* Stacked in the narrow column: the label sits above its controls rather than beside. */
+.props .field { display: block; margin: 0; }
+.props .field > em { display: block; width: auto; margin-bottom: 0.5rem; }
+.chips { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
 .group { margin-bottom: 2rem; }
 
 .nothing {
   margin: 0;
   color: var(--overlay1);
-  font-size: 1.05rem;
+  font-size: 1.1rem;
 }
 
 .label {
   margin: 0 0 1rem;
-  font: 400 11px/1 var(--mono);
+  font: 400 12px/1 var(--mono);
   color: var(--overlay1);
 }
 
@@ -214,7 +239,7 @@ main {
   border: 0;
   border-radius: 5px;
   color: var(--text);
-  font: 500 1.75rem/1.2 var(--sans);
+  font: 500 1.85rem/1.2 var(--sans);
   letter-spacing: -0.02em;
   resize: none;
   overflow: hidden;
@@ -231,12 +256,12 @@ main {
   border: 1px solid var(--surface0);
   border-radius: 999px;
   color: var(--overlay1);
-  font: 400 11.5px var(--mono);
+  font: 400 12.5px var(--mono);
   cursor: pointer;
 }
 #tick:hover { border-color: var(--green); color: var(--green); }
 #tick.go { border-color: var(--green); color: var(--crust); background: var(--green); }
-.spent { font: 400 11.5px var(--mono); color: var(--overlay1); }
+.spent { font: 400 12.5px var(--mono); color: var(--overlay1); }
 
 .row-actions { display: flex; align-items: center; gap: 1.1rem; margin: 0 0 1.75rem; }
 .doc .row-actions { margin: 0; padding: 0.7rem 0 0.8rem; border-top: 1px solid var(--surface0); }
@@ -245,7 +270,7 @@ main {
   background: none;
   border: 0;
   color: var(--overlay1);
-  font: 400 11.5px var(--mono);
+  font: 400 12.5px var(--mono);
   cursor: pointer;
 }
 .edit:hover { color: var(--mauve); }
@@ -261,15 +286,13 @@ main {
   border: 1px solid var(--surface0);
   border-radius: 8px;
   color: var(--subtext0);
-  font: 400 0.82rem/1.6 var(--mono);
+  font: 400 0.87rem/1.6 var(--mono);
   resize: vertical;
 }
 .src:focus { outline: none; border-color: var(--mauve); }
 
 /* ── files ──────────────────────────────────────────────── */
 
-.files { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin: 1.5rem 0; }
-.files > em { width: 4.5rem; flex: none; font: 400 11px var(--mono); font-style: normal; color: var(--overlay1); }
 
 .file {
   display: inline-flex;
@@ -280,7 +303,7 @@ main {
   border: 1px solid var(--surface0);
   border-radius: 6px;
   color: var(--subtext0);
-  font: 400 11.5px var(--mono);
+  font: 400 12.5px var(--mono);
   text-decoration: none;
   cursor: pointer;
 }
@@ -337,7 +360,7 @@ main {
   align-items: center;
   gap: 0.9rem;
   margin-top: 0.4rem;
-  font: 400 11.5px/1.4 var(--mono);
+  font: 400 12.5px/1.4 var(--mono);
   color: var(--overlay1);
   font-variant-numeric: tabular-nums;
 }
@@ -365,9 +388,9 @@ main {
   border-radius: 0 6px 6px 0;
   background: color-mix(in srgb, var(--peach) 8%, transparent);
   color: var(--subtext0);
-  font-size: 0.87rem;
+  font-size: 0.92rem;
 }
-.stuck-note b { flex: none; color: var(--peach); font: 400 11px/1.6 var(--mono); }
+.stuck-note b { flex: none; color: var(--peach); font: 400 12px/1.6 var(--mono); }
 
 .pill {
   display: inline-flex;
@@ -376,7 +399,7 @@ main {
   padding: 0.22rem 0.7rem;
   border: 1px solid var(--surface0);
   border-radius: 999px;
-  font: 400 11.5px var(--mono);
+  font: 400 12.5px var(--mono);
   color: var(--overlay1);
 }
 .pill b { font-weight: 400; color: var(--subtext0); }
@@ -384,7 +407,7 @@ main {
 .tag {
   padding: 0.1rem 0.4rem;
   border-radius: 4px;
-  font-size: 10.5px;
+  font-size: 11.5px;
   letter-spacing: 0.02em;
 }
 
@@ -410,7 +433,7 @@ main {
   overflow: hidden;
   margin-bottom: 1rem;
   color: var(--subtext0);
-  font-size: 0.9rem;
+  font-size: 0.95rem;
 }
 /* Only when something is actually hidden — a gradient over a short description
    would dim its last line for no reason. */
@@ -435,9 +458,9 @@ main {
   font-weight: 500;
   line-height: 1.25;
 }
-.desc h2 { font-size: 1.05rem; }
-.desc h3 { font-size: 0.95rem; }
-.desc h4, .desc h5, .desc h6 { font-size: 0.9rem; color: var(--subtext0); }
+.desc h2 { font-size: 1.1rem; }
+.desc h3 { font-size: 1rem; }
+.desc h4, .desc h5, .desc h6 { font-size: 0.95rem; color: var(--subtext0); }
 
 .desc strong { color: var(--text); font-weight: 500; }
 .desc em { color: var(--text); font-style: italic; }
@@ -449,7 +472,7 @@ main {
   background: var(--crust);
   border-radius: 4px;
   color: var(--peach);
-  font: 400 0.82em/1.4 var(--mono);
+  font: 400 0.86em/1.4 var(--mono);
   overflow-wrap: anywhere;
 }
 
@@ -460,7 +483,7 @@ main {
   border-radius: 8px;
   overflow-x: auto;
 }
-.desc pre code { padding: 0; background: none; color: var(--subtext0); font-size: 0.78rem; line-height: 1.5; }
+.desc pre code { padding: 0; background: none; color: var(--subtext0); font-size: 0.83rem; line-height: 1.5; }
 
 .desc ul, .desc ol { margin: 0 0 0.9rem; padding-left: 1.2rem; }
 .desc li { margin-bottom: 0.3rem; }
@@ -479,14 +502,14 @@ main {
 
 /* Wide tables scroll inside their own box; the page never scrolls sideways. */
 .desc .scroll { margin: 0 0 1rem; overflow-x: auto; }
-.desc table { border-collapse: collapse; font-size: 0.82rem; }
+.desc table { border-collapse: collapse; font-size: 0.87rem; }
 .desc th, .desc td {
   padding: 0.4rem 0.75rem;
   border-bottom: 1px solid var(--surface0);
   text-align: left;
   vertical-align: top;
 }
-.desc th { color: var(--overlay1); font: 400 11px var(--mono); white-space: nowrap; }
+.desc th { color: var(--overlay1); font: 400 12px var(--mono); white-space: nowrap; }
 .desc td { min-width: 6rem; }
 .desc tbody tr:last-child td { border-bottom: 0; }
 
@@ -495,7 +518,7 @@ main {
   background: none;
   border: 0;
   color: var(--mauve);
-  font: 400 11.5px var(--mono);
+  font: 400 12.5px var(--mono);
   cursor: pointer;
   text-decoration: none;
 }
@@ -506,7 +529,7 @@ main {
 .field > em {
   width: 4.5rem;
   flex: none;
-  font: 400 11px var(--mono);
+  font: 400 12px var(--mono);
   font-style: normal;
   color: var(--overlay1);
 }
@@ -517,7 +540,7 @@ main {
   border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
   border-radius: 999px;
   color: var(--c);
-  font: 400 11.5px var(--mono);
+  font: 400 12.5px var(--mono);
   cursor: pointer;
 }
 .chip:hover { background: color-mix(in srgb, var(--c) 15%, transparent); }
@@ -532,7 +555,7 @@ main {
   border: 1px solid var(--surface0);
   border-radius: 5px;
   color: var(--text);
-  font: 400 11.5px var(--mono);
+  font: 400 12.5px var(--mono);
 }
 ::-webkit-calendar-picker-indicator { filter: invert(0.6); }
 
@@ -541,7 +564,7 @@ main {
 /* ── subtasks ───────────────────────────────────────────── */
 
 .kids { margin: 1.25rem 0 0.5rem; max-width: var(--read); }
-.kids > em { font: 400 11px var(--mono); font-style: normal; color: var(--overlay1); }
+.kids > em { font: 400 12px var(--mono); font-style: normal; color: var(--overlay1); }
 .kids ul { list-style: none; margin: 0.5rem 0 0; padding: 0; }
 
 .kids li {
@@ -550,17 +573,17 @@ main {
   gap: 0.55rem;
   padding: 0.3rem 0 0.3rem 0.7rem;
   border-left: 2px solid var(--c);
-  font-size: 0.87rem;
+  font-size: 0.92rem;
 }
 .kids input { accent-color: var(--green); margin: 0; flex: none; }
 .kids a { color: var(--subtext0); text-decoration: none; }
 .kids a:hover { color: var(--text); }
 .kids li:has(input:checked) a { color: var(--overlay0); text-decoration: line-through; }
-.kids .st { margin-left: auto; font: 400 10.5px var(--mono); color: var(--c); white-space: nowrap; }
+.kids .st { margin-left: auto; font: 400 11.5px var(--mono); color: var(--c); white-space: nowrap; }
 
 .notes { list-style: none; margin: 1.25rem 0 0.9rem; padding: 0; max-width: var(--read); }
-.notes li { margin-bottom: 0.8rem; font-size: 0.88rem; }
-.notes em { font: 400 10.5px var(--mono); font-style: normal; color: var(--overlay1); }
+.notes li { margin-bottom: 0.8rem; font-size: 0.93rem; }
+.notes em { font: 400 11.5px var(--mono); font-style: normal; color: var(--overlay1); }
 .notes p { margin: 0.15rem 0 0; color: var(--subtext0); white-space: pre-wrap; }
 
 .say { display: flex; gap: 0.5rem; max-width: var(--read); }
@@ -573,7 +596,7 @@ main {
   border-radius: 6px;
   color: var(--text);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
 }
 .say input::placeholder { color: var(--overlay0); }
 .say button {
@@ -582,14 +605,14 @@ main {
   border: 1px solid var(--surface0);
   border-radius: 6px;
   color: var(--subtext0);
-  font: 400 11.5px var(--mono);
+  font: 400 12.5px var(--mono);
   cursor: pointer;
 }
 .say button:hover { border-color: var(--mauve); color: var(--mauve); }
 
-.foot { display: flex; gap: 1.2rem; margin-top: 1.75rem; font: 400 11px var(--mono); color: var(--overlay1); }
+.foot { display: flex; gap: 1.2rem; margin-top: 1.75rem; font: 400 12px var(--mono); color: var(--overlay1); }
 
-.err { color: var(--red); font: 400 11.5px var(--mono); }
+.err { color: var(--red); font: 400 12.5px var(--mono); }
 
 @media (prefers-reduced-motion: no-preference) {
   .detail { animation: unfold 0.16s ease-out; }
@@ -600,5 +623,5 @@ main {
   #bar { gap: 0.9rem; padding: 0 0.7rem; }
   .stats { display: none; }
   main { padding: 2.5rem 1rem 6rem; }
-  #title { font-size: 1.35rem; }
+  #title { font-size: 1.45rem; }
 }

@@ -349,61 +349,67 @@ async function renderStage() {
   const d = task.due_date && new Date(Number(task.due_date));
   const dueVal = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : '';
 
+  /* Two children, two columns: everything you read and write on the left at the
+     reading measure, the short controls on the right. Below 1400px they stack and it
+     is the same page it always was. */
   stage.innerHTML = `
-    <textarea id="title" rows="1" spellcheck="false" aria-label="Task name">${txt(task.name)}</textarea>
-    <div class="crumb">${metaOf(task)}
-      <button id="tick" class="${running ? 'go' : ''}">${running ? 'stop' : 'start'} timer</button>
-      ${full.time_spent ? `<span class="spent">${clocked(full.time_spent)} logged</span>` : ''}
+    <div class="col">
+      <textarea id="title" rows="1" spellcheck="false" aria-label="Task name">${txt(task.name)}</textarea>
+      <div class="crumb">${metaOf(task)}
+        <button id="tick" class="${running ? 'go' : ''}">${running ? 'stop' : 'start'} timer</button>
+        ${full.time_spent ? `<span class="spent">${clocked(full.time_spent)} logged</span>` : ''}
+      </div>
+
+      ${stuck ? `<p class="stuck-note"><b>blocked</b>${txt(fieldText(stuck))}</p>` : ''}
+
+      <div id="body"></div>
+
+      ${kids.length ? `<div class="kids">
+        <em>${done} of ${kids.length} done</em>
+        <ul>${kids.map((k) => `<li style="--c:${snap(k.status.color)}">
+          <input type="checkbox" data-kid="${esc(k.id)}" ${shut(k) ? 'checked' : ''}>
+          <a href="${esc(k.url)}" target="_blank" rel="noreferrer">${txt(k.name)}</a>
+          ${k.status.type === 'custom' ? `<span class="st">${txt(low(k.status.status))}</span>` : ''}
+          </li>`).join('')}</ul></div>` : ''}
+
+      <ul class="notes">${said.comments.slice(0, 6).map((c) => `
+        <li><em>${txt(c.user?.username ?? 'someone')} &nbsp; ${esc(ago(c.date))}</em>
+        <p>${txt(c.comment_text)}</p></li>`).join('')}</ul>
+
+      <form class="say"><input name="text" placeholder="Add an update" autocomplete="off"><button>post</button></form>
+
+      <div class="foot">
+        <span>created ${esc(ago(task.date_created))}</span>
+        <a class="link" href="${esc(task.url)}" target="_blank" rel="noreferrer">open in clickup</a>
+      </div>
     </div>
 
-    ${stuck ? `<p class="stuck-note"><b>blocked</b>${txt(fieldText(stuck))}</p>` : ''}
+    <aside class="props">
+      <div class="field"><em>status</em><div class="chips">${list.statuses.map((s) => `
+        <button class="chip" data-do="status" data-v="${esc(s.status)}" style="--c:${snap(s.color)}"
+          aria-current="${s.status === task.status.status}">${txt(low(s.status))}</button>`).join('')}</div></div>
 
-    <div id="body"></div>
+      <div class="field"><em>priority</em><div class="chips">${PRIOS.map((p) => `
+        <button class="chip" data-do="priority" data-v="${p.id}" style="--c:${p.c}"
+          aria-current="${task.priority?.priority === p.name}">${p.name}</button>`).join('')}
+        <button class="chip" data-do="priority" data-v="" style="--c:var(--overlay1)"
+          aria-current="${!task.priority}">none</button></div></div>
 
-    <div class="field"><em>status</em>${list.statuses.map((s) => `
-      <button class="chip" data-do="status" data-v="${esc(s.status)}" style="--c:${snap(s.color)}"
-        aria-current="${s.status === task.status.status}">${txt(low(s.status))}</button>`).join('')}</div>
+      <div class="field"><em>due</em><div class="chips">
+        <input type="date" value="${dueVal}">
+        <button class="chip" data-do="due" data-v="today" style="--c:var(--overlay1)">today</button>
+        <button class="chip" data-do="due" data-v="" style="--c:var(--overlay1)" ${dueVal ? '' : 'disabled'}>clear</button>
+      </div></div>
 
-    <div class="field"><em>priority</em>${PRIOS.map((p) => `
-      <button class="chip" data-do="priority" data-v="${p.id}" style="--c:${p.c}"
-        aria-current="${task.priority?.priority === p.name}">${p.name}</button>`).join('')}
-      <button class="chip" data-do="priority" data-v="" style="--c:var(--overlay1)"
-        aria-current="${!task.priority}">none</button></div>
+      ${fields.length ? `<div class="field"><em>fields</em><div class="chips">${fields.map(([f, v]) => `
+        <span class="pill">${txt(f.name)}<b>${txt(v)}</b></span>`).join('')}</div></div>` : ''}
 
-    <div class="field"><em>due</em>
-      <input type="date" value="${dueVal}">
-      <button class="chip" data-do="due" data-v="today" style="--c:var(--overlay1)">today</button>
-      <button class="chip" data-do="due" data-v="" style="--c:var(--overlay1)" ${dueVal ? '' : 'disabled'}>clear</button>
-    </div>
-
-    ${fields.length ? `<div class="field"><em>fields</em>${fields.map(([f, v]) => `
-      <span class="pill">${txt(f.name)}<b>${txt(v)}</b></span>`).join('')}</div>` : ''}
-
-    ${kids.length ? `<div class="kids">
-      <em>${done} of ${kids.length} done</em>
-      <ul>${kids.map((k) => `<li style="--c:${snap(k.status.color)}">
-        <input type="checkbox" data-kid="${esc(k.id)}" ${shut(k) ? 'checked' : ''}>
-        <a href="${esc(k.url)}" target="_blank" rel="noreferrer">${txt(k.name)}</a>
-        ${k.status.type === 'custom' ? `<span class="st">${txt(low(k.status.status))}</span>` : ''}
-        </li>`).join('')}</ul></div>` : ''}
-
-    <div class="files">
-      <em>files</em>
-      ${files.map((f) => `<a class="file" href="${esc(f.url)}" target="_blank" rel="noreferrer">
-        ${txt(f.title)} <span>${esc(size(Number(f.size) || 0))}</span></a>`).join('')}
-      <label class="file add">add<input type="file" id="drop" multiple hidden></label>
-    </div>
-
-    <ul class="notes">${said.comments.slice(0, 6).map((c) => `
-      <li><em>${txt(c.user?.username ?? 'someone')} &nbsp; ${esc(ago(c.date))}</em>
-      <p>${txt(c.comment_text)}</p></li>`).join('')}</ul>
-
-    <form class="say"><input name="text" placeholder="Add an update" autocomplete="off"><button>post</button></form>
-
-    <div class="foot">
-      <span>created ${esc(ago(task.date_created))}</span>
-      <a class="link" href="${esc(task.url)}" target="_blank" rel="noreferrer">open in clickup</a>
-    </div>`;
+      <div class="field"><em>files</em><div class="chips">
+        ${files.map((f) => `<a class="file" href="${esc(f.url)}" target="_blank" rel="noreferrer">
+          ${txt(f.title)} <span>${esc(size(Number(f.size) || 0))}</span></a>`).join('')}
+        <label class="file add">add<input type="file" id="drop" multiple hidden></label>
+      </div></div>
+    </aside>`;
 
   showBody(src);
   fit($('#title'));
