@@ -300,10 +300,10 @@ function stats() {
   const flight = tasks.filter((t) => t.status.type === 'custom').length;
   const stuck = tasks.filter(blockedBy).length;
   $('#stats').innerHTML = `
-    <span class="on"><i>&#9679;</i>${tasks.filter((t) => !shut(t)).length} open</span>
-    <span><i>&#9680;</i>${flight} in flight</span>
-    <span class="${stuck ? 'stuck' : ''}"><i>&#8709;</i>${stuck} blocked</span>
-    ${late ? `<span class="late"><i>&#9650;</i>${late} late</span>` : ''}`;
+    <span class="c-open"><i>&#9679;</i>${tasks.filter((t) => !shut(t)).length} open</span>
+    <span class="c-flight"><i>&#9680;</i>${flight} in flight</span>
+    <span class="c-stuck"><i>&#8709;</i>${stuck} blocked</span>
+    ${late ? `<span class="c-late"><i>&#9650;</i>${late} late</span>` : ''}`;
 }
 
 /* ── stage ──────────────────────────────────────────────────────── */
@@ -375,6 +375,7 @@ async function renderStage() {
 
       ${kids.length ? `<div class="kids">
         <em>${done} of ${kids.length} done</em>
+        <div class="gauge"><i style="width:${Math.round((done / kids.length) * 100)}%"></i></div>
         <ul>${kids.map((k) => `<li style="--c:${snap(k.status.color)}">
           <input type="checkbox" data-kid="${esc(k.id)}" ${shut(k) ? 'checked' : ''}>
           <a href="${esc(k.url)}" target="_blank" rel="noreferrer">${txt(k.name)}</a>
@@ -532,6 +533,7 @@ $('#stage').addEventListener('change', async (e) => {
       bodies.delete(task.id);
       const ticked = $$('.kids input').filter((x) => x.checked).length;
       $('.kids em').textContent = `${ticked} of ${kids.length} done`;
+      $('.gauge i').style.width = `${Math.round((ticked / kids.length) * 100)}%`;
     } catch (err) {
       el.checked = !el.checked;
       fail(err, 'subtask unchanged');

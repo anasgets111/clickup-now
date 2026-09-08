@@ -34,9 +34,12 @@ running timer with elapsed time; and a `● n changed` badge when ClickUp has mo
 
 - **Nothing moves unless you move it.** Polling every 90s only raises the badge. New data waits
   until you click it. Re-rendering under someone mid-sentence is the thing this exists to avoid.
-- **Colour is only ever meaning.** Every colour is a status, a priority or a tag. Your workspace's
-  status colours are snapped to the nearest Catppuccin Mocha accent by hue, so they sit in the
-  palette without being invented.
+- **Colour says which field you are reading**, the way `dysk` colours a column rather than a
+  value. Location is always lavender, a person is always their own ClickUp colour, an estimate is
+  teal, time logged is green, a due date is sky until it is late. Learn the palette once and you
+  read the line by hue instead of by position. Status colours come from your workspace, snapped
+  to the nearest Mocha accent by hue so they sit in the palette without being invented.
+- **A proportion gets a gauge**, not a sentence. Subtask progress is a bar.
 - **Priority shows only when it's urgent or high.** Normal and low are noise.
 - **Sorted by priority, not by date.** Overdue first, then priority, then date. Almost nothing in
   this workspace carries a due date, so leading with the date sorted on a value that is usually

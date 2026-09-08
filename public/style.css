@@ -73,9 +73,12 @@ body {
 .stats { display: flex; gap: 1.1rem; }
 .stats i { font-style: normal; margin-right: 0.35rem; }
 .stats span { font-variant-numeric: tabular-nums; }
-.stats .on { color: var(--text); }
-.stats .late { color: var(--red); }
-.stats .stuck { color: var(--peach); }
+/* Each counter keeps its colour whatever its value, so the bar is read by hue rather
+   than by counting along it. A zero stays coloured; that is the point. */
+.stats .c-open   { color: var(--sky); }
+.stats .c-flight { color: var(--yellow); }
+.stats .c-stuck  { color: var(--peach); }
+.stats .c-late   { color: var(--red); }
 
 .tools { display: flex; align-items: center; gap: 0.85rem; margin-left: auto; }
 
@@ -167,7 +170,14 @@ main {
     gap: 3.5rem;
     align-items: start;
   }
-  .props { position: sticky; top: 5.5rem; }
+  /* A visible edge, so the column reads as its own region rather than text that
+     happens to sit further right. */
+  .props {
+    position: sticky;
+    top: 5.5rem;
+    padding-left: 2rem;
+    border-left: 1px solid var(--surface0);
+  }
 }
 
 .props { display: flex; flex-direction: column; gap: 1.5rem; }
@@ -577,6 +587,19 @@ main {
 
 .kids { margin: 1.25rem 0 0.5rem; max-width: var(--read); }
 .kids > em { font: 400 12px var(--mono); font-style: normal; color: var(--overlay1); }
+
+/* A proportion deserves a proportion. "0 of 9 done" is a sentence you have to read;
+   the bar is the same fact at a glance. */
+.gauge {
+  max-width: var(--read);
+  height: 4px;
+  margin: 0.55rem 0 1rem;
+  border-radius: 2px;
+  background: var(--surface0);
+  overflow: hidden;
+}
+.gauge i { display: block; height: 100%; background: var(--green); border-radius: 2px; }
+@media (prefers-reduced-motion: no-preference) { .gauge i { transition: width 0.25s ease; } }
 .kids ul { list-style: none; margin: 0.5rem 0 0; padding: 0; }
 
 .kids li {
