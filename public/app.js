@@ -226,9 +226,9 @@ const byId = (id) => everything().find((t) => t.id === id);
    but not here: almost nothing in this workspace carries a due date, so everything tied
    on the sentinel and fell through to priority anyway. Priority is the real signal —
    it is set on most tasks — so it leads, and a genuinely late task still jumps it. */
-const overdue = (t) => (t.due_date && Number(t.due_date) < Date.now() ? 0 : 1);
+const late = (t) => Boolean(t.due_date) && Number(t.due_date) < Date.now();
 const byUrgency = (a, b) =>
-  overdue(a) - overdue(b) ||
+  Number(late(b)) - Number(late(a)) ||
   Number(a.priority?.id ?? 9) - Number(b.priority?.id ?? 9) ||
   (a.due_date ? Number(a.due_date) : 9e15) - (b.due_date ? Number(b.due_date) : 9e15);
 
@@ -237,7 +237,6 @@ const byUrgency = (a, b) =>
 /* `full` adds what will not fit in a 22rem rail row: tags, estimate, who else is on
    it, when it last moved. The rail gets the short form, the open task the long one. */
 function metaOf(t, full = false) {
-  const late = t.due_date && Number(t.due_date) < Date.now();
   const where = t.folder && !t.folder.hidden ? `${t.folder.name}/${t.list.name}` : t.list.name;
   const p = t.priority && PRIOS.find((x) => x.name === t.priority.priority);
   const others = t.assignees.filter((a) => String(a.id) !== String(me.id));
@@ -245,7 +244,7 @@ function metaOf(t, full = false) {
   return `<span class="meta">
     <span class="st">${txt(low(t.status.status))}</span>
     <span class="where">${txt(where)}</span>
-    ${t.due_date ? `<span class="${late ? 'late' : 'when'}">${esc(due(t.due_date))}</span>` : ''}
+    ${t.due_date ? `<span class="${late(t) ? 'late' : 'when'}">${esc(due(t.due_date))}</span>` : ''}
     ${p && p.id < 3 ? `<span class="prio" style="--p:${p.c}">&#9873; ${p.name}</span>` : ''}
     ${blockedBy(t) ? '<span class="stuck">blocked</span>' : ''}
     ${full && t.time_estimate ? `<span class="est">${Math.round(t.time_estimate / 36e5)}h est</span>` : ''}
@@ -270,19 +269,18 @@ function renderRail() {
     { label: 'in flight', list: mine.filter((t) => t.status.type === 'custom') },
     { label: q ? 'matching' : 'mine', list: mine.filter((t) => t.status.type !== 'custom') },
   ];
+  // Each group claims its tasks, then adds them to `already` so later groups do not
+  // repeat them. Claiming has to come first: adding a pin's tasks before filtering that
+  // same pin excluded every one of them, and a pinned list rendered empty.
   const already = new Set(mine.map((t) => t.id));
-  for (const p of pins) {
-    for (const t of pool.get(p.id) ?? []) already.add(t.id);
-    groups.push({
-      label: p.name,
-      pin: p.id,
-      list: (pool.get(p.id) ?? []).filter((t) => !already.has(t.id) && hit(t)).sort(byUrgency),
-    });
-  }
+  const claim = (from) => {
+    const got = from.filter((t) => !already.has(t.id) && hit(t)).sort(byUrgency);
+    for (const t of got) already.add(t.id);
+    return got;
+  };
 
-  if (watched.length) {
-    groups.push({ label: 'watching, this week', list: watched.filter((t) => !already.has(t.id) && hit(t)).sort(byUrgency) });
-  }
+  for (const p of pins) groups.push({ label: p.name, pin: p.id, list: claim(pool.get(p.id) ?? []) });
+  if (watched.length) groups.push({ label: 'watching, this week', list: claim(watched) });
 
   const parts = groups.filter((g) => g.list.length || g.pin).map((g) => `<div class="group">
     <p class="label">${txt(g.label)} <b>${g.list.length}</b>
@@ -296,14 +294,14 @@ function renderRail() {
    rarely carry a due date. These three are always true of the data; late still appears,
    but only when there is something to say. */
 function stats() {
-  const late = tasks.filter((t) => t.due_date && Number(t.due_date) < Date.now()).length;
+  const overdue = tasks.filter(late).length;
   const flight = tasks.filter((t) => t.status.type === 'custom').length;
   const stuck = tasks.filter(blockedBy).length;
   $('#stats').innerHTML = `
     <span class="c-open"><i>&#9679;</i>${tasks.filter((t) => !shut(t)).length} open</span>
     <span class="c-flight"><i>&#9680;</i>${flight} in flight</span>
     <span class="c-stuck"><i>&#8709;</i>${stuck} blocked</span>
-    ${late ? `<span class="c-late"><i>&#9650;</i>${late} late</span>` : ''}`;
+    ${overdue ? `<span class="c-late"><i>&#9650;</i>${overdue} late</span>` : ''}`;
 }
 
 /* ── stage ──────────────────────────────────────────────────────── */
@@ -683,6 +681,9 @@ $('#rail').addEventListener('click', async (e) => {
     renderRail();
     return;
   }
+  const team = e.target.closest('[data-team]');
+  if (team) { localStorage.setItem('teamId', team.dataset.team); location.reload(); return; }
+
   const row = e.target.closest('.row');
   if (!row || row.dataset.id === picked) return;
   picked = row.dataset.id;
@@ -704,26 +705,23 @@ async function pages(path, extra = {}) {
 }
 
 async function fetchAll() {
-  const q = new URLSearchParams({ order_by: 'due_date' });
-  q.append('assignees[]', me.id);
-  // You watch 100+ tasks, which is not a list anyone can read. Narrow it server-side to
-  // the ones that actually moved this week — date_updated_gt cuts it to about a third.
-  const w = new URLSearchParams({ order_by: 'updated', reverse: 'true', subtasks: 'false',
-    date_updated_gt: String(Date.now() - 7 * 864e5) });
-  w.append('watchers[]', me.id);
+  // You watch 100+ tasks, which is not a list anyone can read. Narrowed server-side to
+  // the ones that moved this week — date_updated_gt cuts it to about a third.
+  const watching = { order_by: 'updated', reverse: 'true', subtasks: 'false',
+    date_updated_gt: Date.now() - 7 * 864e5, 'watchers[]': me.id };
 
   // Top-level only for a pinned list: subtasks belong inside their parent, not as peers.
-  const [mine, extra, seenAlso] = await Promise.all([
-    pages(`/team/${teamId}/task`, Object.fromEntries(q)),
+  const [mine, extra, alsoWatched] = await Promise.all([
+    pages(`/team/${teamId}/task`, { order_by: 'due_date', 'assignees[]': me.id }),
     Promise.all(pins.map(async (p) => [p.id, await pages(`/list/${p.id}/task`, { subtasks: 'false' })])),
-    $('#watch').checked ? pages(`/team/${teamId}/task`, Object.fromEntries(w)) : [],
+    $('#watch').checked ? pages(`/team/${teamId}/task`, watching) : [],
   ]);
-  return { mine, extra, watched: seenAlso };
+  return { mine, extra, watched: alsoWatched };
 }
 
-function adopt({ mine, extra, watched: seenAlso }) {
+function adopt({ mine, extra, watched: alsoWatched }) {
   tasks = mine;
-  watched = seenAlso ?? [];
+  watched = alsoWatched ?? [];
   pool.clear();
   for (const [id, list] of extra) pool.set(id, list);
   seen = new Map(everything().map((t) => [t.id, t.date_updated]));
@@ -753,8 +751,9 @@ async function poll() {
   if (document.hidden || !teamId) return;
   const fresh = await fetchAll();
   const all = [fresh.mine, fresh.watched ?? [], ...fresh.extra.map(([, l]) => l)].flat();
+  const live = new Set(all.map((t) => t.id));
   const changed = all.filter((t) => seen.get(t.id) !== t.date_updated).length;
-  const gone = everything().filter((t) => !all.some((f) => f.id === t.id)).length;
+  const gone = everything().filter((t) => !live.has(t.id)).length;
   const restyled = await statusesMoved();
   if (!(changed + gone + restyled)) return;
   fresher = fresh;
@@ -814,16 +813,13 @@ try {
   if (teamId) {
     localStorage.setItem('teamId', teamId);
     await load();
-    readTimer().catch(() => {});
+    tick();
   } else {
     // ponytail: one-time picker kept in localStorage; clear with localStorage.removeItem('teamId')
+    // The rail's own click handler picks this up; no second listener needed.
     $('#rail').innerHTML = `<p class="label">which workspace</p><div class="field">${teams
       .map((t) => `<button class="chip" style="--c:var(--mauve)" data-team="${esc(t.id)}">${txt(t.name)}</button>`)
       .join('')}</div>`;
-    $('#rail').addEventListener('click', (e) => {
-      const b = e.target.closest('[data-team]');
-      if (b) { localStorage.setItem('teamId', b.dataset.team); location.reload(); }
-    });
   }
 } catch (err) {
   $('#stats').innerHTML = `<span class="err">${esc(err.message)} &mdash; check CLICKUP_TOKEN in .env</span>`;
