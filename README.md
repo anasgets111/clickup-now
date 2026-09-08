@@ -63,6 +63,8 @@ running timer with elapsed time; and a `● n changed` badge when ClickUp has mo
   every cached list definition.
 - Rate limit is 100 requests/minute on your plan. A poll costs one request, plus one per pinned
   list, plus one for the open task's list — so a dozen pins would need rethinking.
+- An update is answered with the whole task, so an edit is one request. Opening a task is three
+  (list, comments, task) and they are cached until you refresh.
 
 ## Fiddling
 

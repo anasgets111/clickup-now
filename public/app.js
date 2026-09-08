@@ -321,10 +321,29 @@ const notesOf = (id) => once(notes, id, () => api(`/task/${id}/comment`));
 // identical and stripped. markdown_description only exists on the single-task fetch.
 const bodyOf = (id) => once(bodies, id, () => api(`/task/${id}?include_markdown_description=true&include_subtasks=true`));
 
+/* ClickUp answers an update with the whole task — every field the full fetch carries
+   except markdown_description, subtasks and attachments included. So an edit needs one
+   request, not five: this used to PUT, then reload the workspace, then let adopt() clear
+   the caches, which made the next render refetch the list, the comments and the 51KB
+   task again. Merging the reply costs nothing. */
 async function patch(task, body) {
-  await api(`/task/${task.id}`, { method: 'PUT', body: JSON.stringify(body) });
-  bodies.delete(task.id);
-  await load();
+  const updated = await api(`/task/${task.id}`, { method: 'PUT', body: JSON.stringify(body) });
+
+  Object.assign(task, updated);          // the object the rail and the stage render from
+  seen.set(task.id, updated.date_updated); // or the next poll reports your own edit back
+
+  if (bodies.has(task.id)) {
+    const held = await bodies.get(task.id);
+    // The reply omits markdown_description, so keep the copy we hold — unless this edit
+    // is what changed it, in which case what we sent is the truth.
+    const merged = { ...held, ...updated };
+    if (body.markdown_content !== undefined) merged.markdown_description = body.markdown_content;
+    bodies.set(task.id, Promise.resolve(merged));
+  }
+
+  stats();
+  renderRail();
+  await renderStage();
 }
 
 async function renderStage() {
@@ -332,7 +351,8 @@ async function renderStage() {
   const task = byId(picked);
   if (!task) { stage.innerHTML = '<p class="quiet">Pick something on the left.</p>'; return; }
 
-  stage.innerHTML = `<p class="label">opening</p>`;
+  const warm = lists.has(task.list.id) && notes.has(task.id) && bodies.has(task.id);
+  if (!warm) stage.innerHTML = '<p class="label">opening</p>';
   let list, said, full;
   try {
     [list, said, full] = await Promise.all([listOf(task.list.id), notesOf(task.id), bodyOf(task.id)]);
