@@ -181,11 +181,10 @@ main {
 .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
 .group { margin-bottom: 2rem; }
 
-.nothing {
-  margin: 0;
-  color: var(--overlay1);
-  font-size: 1.1rem;
-}
+/* Empty states. These were styled as .nothing, which nothing has emitted since the
+   class was renamed — so "Nothing on you right now" has been rendering at full body
+   weight, louder than the tasks it stands in for. */
+.quiet { margin: 0; color: var(--overlay1); font-size: 0.95rem; }
 
 .label {
   margin: 0 0 1rem;
@@ -614,9 +613,11 @@ main {
 
 .err { color: var(--red); font: 400 12.5px var(--mono); }
 
+/* The stage swaps content when you pick a task, and a fade on that reads as lag
+   rather than as feedback. Motion now belongs only to things that answer a click. */
 @media (prefers-reduced-motion: no-preference) {
-  .detail { animation: unfold 0.16s ease-out; }
-  @keyframes unfold { from { opacity: 0; } }
+  #stage .col, .props { animation: settle 0.14s ease-out; }
+  @keyframes settle { from { opacity: 0; } }
 }
 
 @media (max-width: 640px) {

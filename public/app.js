@@ -234,16 +234,23 @@ const byUrgency = (a, b) =>
 
 /* ── rail ───────────────────────────────────────────────────────── */
 
-function metaOf(t) {
+/* `full` adds what will not fit in a 22rem rail row: tags, estimate, who else is on
+   it, when it last moved. The rail gets the short form, the open task the long one. */
+function metaOf(t, full = false) {
   const late = t.due_date && Number(t.due_date) < Date.now();
   const where = t.folder && !t.folder.hidden ? `${t.folder.name}/${t.list.name}` : t.list.name;
   const p = t.priority && PRIOS.find((x) => x.name === t.priority.priority);
+  const others = t.assignees.filter((a) => String(a.id) !== String(me.id));
   return `<span class="meta">
     <span class="st">${txt(low(t.status.status))}</span>
     <span>${txt(where)}</span>
     ${t.due_date ? `<span class="${late ? 'late' : ''}">${esc(due(t.due_date))}</span>` : ''}
     ${p && p.id < 3 ? `<span class="prio" style="--p:${p.c}">&#9873; ${p.name}</span>` : ''}
     ${blockedBy(t) ? '<span class="stuck">blocked</span>' : ''}
+    ${full && t.time_estimate ? `<span>${Math.round(t.time_estimate / 36e5)}h est</span>` : ''}
+    ${full && others.length ? `<span>with ${others.map((a) => txt(a.initials)).join(' ')}</span>` : ''}
+    ${full ? `<span>${esc(ago(t.date_updated))}</span>` : ''}
+    ${full ? t.tags.map((g) => `<span class="tag" style="background:${esc(g.tag_bg)};color:${esc(g.tag_fg)}">${txt(g.name)}</span>`).join('') : ''}
   </span>`;
 }
 
@@ -355,7 +362,7 @@ async function renderStage() {
   stage.innerHTML = `
     <div class="col">
       <textarea id="title" rows="1" spellcheck="false" aria-label="Task name">${txt(task.name)}</textarea>
-      <div class="crumb">${metaOf(task)}
+      <div class="crumb">${metaOf(task, true)}
         <button id="tick" class="${running ? 'go' : ''}">${running ? 'stop' : 'start'} timer</button>
         ${full.time_spent ? `<span class="spent">${clocked(full.time_spent)} logged</span>` : ''}
       </div>
