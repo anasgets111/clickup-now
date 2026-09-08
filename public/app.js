@@ -202,6 +202,8 @@ function fieldText(f) {
   return String(v);
 }
 
+const pct = (done, total) => `${Math.round((done / total) * 100)}%`;
+
 const fieldsOn = (t) => (t.custom_fields ?? []).map((f) => [f, fieldText(f)]).filter(([, v]) => v);
 
 /* ponytail: a workspace convention, not an API concept. Arsel tracks stoppages in a
@@ -348,7 +350,7 @@ async function renderStage() {
   const openStatus = list.statuses.find((s) => s.type === 'open') ?? list.statuses[0];
   const files = full.attachments ?? [];
   const src = full.markdown_description ?? '';
-  const stuck = blockedBy(full) ?? blockedBy(task);
+  const stuck = blockedBy(full);
   const fields = fieldsOn(full).filter(([f]) => f !== stuck);
   const running = timer?.task?.id === task.id;
 
@@ -373,7 +375,7 @@ async function renderStage() {
 
       ${kids.length ? `<div class="kids">
         <em>${done} of ${kids.length} done</em>
-        <div class="gauge"><i style="width:${Math.round((done / kids.length) * 100)}%"></i></div>
+        <div class="gauge"><i style="width:${pct(done, kids.length)}"></i></div>
         <ul>${kids.map((k) => `<li style="--c:${snap(k.status.color)}">
           <input type="checkbox" data-kid="${esc(k.id)}" ${shut(k) ? 'checked' : ''}>
           <a href="${esc(k.url)}" target="_blank" rel="noreferrer">${txt(k.name)}</a>
@@ -427,7 +429,10 @@ async function renderStage() {
 /* A task name is a heading, so it has to wrap at the reading measure like everything
    else on the stage. An <input> would have scrolled sideways instead, and names here run
    past 50 characters. */
-const fit = (el) => { el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px`; };
+const fit = (el, cap = Infinity) => {
+  el.style.height = 'auto';
+  el.style.height = `${Math.min(el.scrollHeight + 2, cap)}px`;
+};
 
 /* Description: rendered by default, raw markdown when editing. Kept in one place so
    the two states can never drift apart. */
@@ -439,7 +444,7 @@ function showBody(src, editing = false) {
       <div class="row-actions"><button class="chip" id="save" style="--c:var(--green)">save</button>
       <button class="chip" id="drop-edit" style="--c:var(--overlay1)">cancel</button></div>`;
     const ta = el.querySelector('.src');
-    ta.style.height = `${Math.min(ta.scrollHeight + 4, 600)}px`;
+    fit(ta, 600);
     ta.focus();
     return;
   }
@@ -468,6 +473,10 @@ async function busy(b, run, what) {
   b.disabled = true;
   try { await run(); } catch (err) { fail(err, what); b.textContent = was; b.disabled = false; }
 }
+
+/* The non-button counterpart to busy(): every edit here is "do it, or say what did not
+   change". */
+const tryTo = (what, run) => run().catch((err) => fail(err, what));
 
 function fail(err, what) {
   // One error line at a time; repeated failures used to pile up until the next render.
@@ -507,16 +516,12 @@ $('#stage').addEventListener('change', async (e) => {
   if (el.id === 'title') {
     const name = el.value.trim();
     if (!name || name === unent(task.name)) return;
-    try { await patch(task, { name }); } catch (err) { fail(err, 'name unchanged'); }
-    return;
+    return tryTo('name unchanged', () => patch(task, { name }));
   }
 
   if (el.type === 'date') {
-    const v = el.value;
-    try {
-      await patch(task, { due_date: v ? new Date(`${v}T23:59`).getTime() : null, due_date_time: false });
-    } catch (err) { fail(err, 'due date unchanged'); }
-    return;
+    const when = el.value ? new Date(`${el.value}T23:59`).getTime() : null;
+    return tryTo('due date unchanged', () => patch(task, { due_date: when, due_date_time: false }));
   }
 
   if (el.dataset.kid) {
@@ -531,7 +536,7 @@ $('#stage').addEventListener('change', async (e) => {
       bodies.delete(task.id);
       const ticked = $$('.kids input').filter((x) => x.checked).length;
       $('.kids em').textContent = `${ticked} of ${kids.length} done`;
-      $('.gauge i').style.width = `${Math.round((ticked / kids.length) * 100)}%`;
+      $('.gauge i').style.width = pct(ticked, kids.length);
     } catch (err) {
       el.checked = !el.checked;
       fail(err, 'subtask unchanged');
@@ -555,6 +560,7 @@ $('#stage').addEventListener('change', async (e) => {
       bodies.delete(task.id);
       await renderStage();
     } catch (err) { fail(err, 'file not attached'); }
+    el.value = '';
   }
 });
 

@@ -191,9 +191,9 @@ main {
 .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
 .group { margin-bottom: 2rem; }
 
-/* Empty states. These were styled as .nothing, which nothing has emitted since the
-   class was renamed — so "Nothing on you right now" has been rendering at full body
-   weight, louder than the tasks it stands in for. */
+/* Empty states. These carried the styling of an older class name that nothing emitted
+   any more, so "Nothing on you right now" rendered at full body weight, louder than the
+   tasks it stands in for. */
 .quiet { margin: 0; color: var(--overlay1); font-size: 0.95rem; }
 
 .label {
