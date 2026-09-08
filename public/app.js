@@ -350,7 +350,7 @@ async function renderStage() {
   const dueVal = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : '';
 
   stage.innerHTML = `
-    <input id="title" value="${txt(task.name)}" spellcheck="false" aria-label="Task name">
+    <textarea id="title" rows="1" spellcheck="false" aria-label="Task name">${txt(task.name)}</textarea>
     <div class="crumb">${metaOf(task)}
       <button id="tick" class="${running ? 'go' : ''}">${running ? 'stop' : 'start'} timer</button>
       ${full.time_spent ? `<span class="spent">${clocked(full.time_spent)} logged</span>` : ''}
@@ -406,8 +406,14 @@ async function renderStage() {
     </div>`;
 
   showBody(src);
+  fit($('#title'));
   ctx = { task, list, kids, shutStatus, openStatus, src };
 }
+
+/* A task name is a heading, so it has to wrap at the reading measure like everything
+   else on the stage. An <input> would have scrolled sideways instead, and names here run
+   past 50 characters. */
+const fit = (el) => { el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px`; };
 
 /* Description: rendered by default, raw markdown when editing. Kept in one place so
    the two states can never drift apart. */
@@ -535,6 +541,13 @@ $('#stage').addEventListener('change', async (e) => {
       await renderStage();
     } catch (err) { fail(err, 'file not attached'); }
   }
+});
+
+$('#stage').addEventListener('input', (e) => e.target.id === 'title' && fit(e.target));
+
+// Enter commits the name rather than putting a newline in a heading.
+$('#stage').addEventListener('keydown', (e) => {
+  if (e.target.id === 'title' && e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
 });
 
 $('#stage').addEventListener('submit', async (e) => {
