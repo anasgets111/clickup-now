@@ -322,13 +322,13 @@ async function renderStage() {
     <div class="field"><em>priority</em>${PRIOS.map((p) => `
       <button class="chip" data-do="priority" data-v="${p.id}" style="--c:${p.c}"
         aria-current="${task.priority?.priority === p.name}">${p.name}</button>`).join('')}
-      <button class="chip" data-do="priority" data-v="" style="--c:var(--surface1)"
+      <button class="chip" data-do="priority" data-v="" style="--c:var(--overlay1)"
         aria-current="${!task.priority}">none</button></div>
 
     <div class="field"><em>due</em>
       <input type="date" value="${dueVal}">
       <button class="chip" data-do="due" data-v="today" style="--c:var(--overlay1)">today</button>
-      <button class="chip" data-do="due" data-v="" style="--c:var(--surface1)" ${dueVal ? '' : 'disabled'}>clear</button>
+      <button class="chip" data-do="due" data-v="" style="--c:var(--overlay1)" ${dueVal ? '' : 'disabled'}>clear</button>
     </div>
 
     ${kids.length ? `<div class="kids">
@@ -369,19 +369,23 @@ function showBody(src, editing = false) {
   if (editing) {
     el.innerHTML = `<textarea class="src" spellcheck="false">${esc(src)}</textarea>
       <div class="row-actions"><button class="chip" id="save" style="--c:var(--green)">save</button>
-      <button class="chip" id="drop-edit" style="--c:var(--surface1)">cancel</button></div>`;
+      <button class="chip" id="drop-edit" style="--c:var(--overlay1)">cancel</button></div>`;
     const ta = el.querySelector('.src');
     ta.style.height = `${Math.min(ta.scrollHeight + 4, 600)}px`;
     ta.focus();
     return;
   }
   el.innerHTML = src.trim()
-    ? `<div class="desc">${md(src)}</div><div class="row-actions"><button class="more" hidden>show all</button><button class="edit">edit</button></div>`
+    ? `<div class="doc"><div class="desc">${md(src)}</div>
+       <div class="row-actions"><button class="more" hidden>show all</button><button class="edit">edit</button></div></div>`
     : `<div class="row-actions"><button class="edit">add a description</button></div>`;
   const desc = el.querySelector('.desc');
   const more = el.querySelector('.more');
   // Only offer the toggle when there is actually something hidden behind the fade.
-  if (desc && more && desc.scrollHeight > desc.clientHeight + 4) more.hidden = false;
+  if (desc && more && desc.scrollHeight > desc.clientHeight + 4) {
+    more.hidden = false;
+    desc.classList.add('clipped');
+  }
 }
 
 /* Listeners are delegated and registered once. Binding them inside renderStage would

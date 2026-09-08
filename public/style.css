@@ -6,8 +6,9 @@
   --mantle: #181825;
   --base: #1e1e2e;
   --surface0: #313244;
-  --surface1: #45475a;
-  --overlay1: #7f849c;
+  --surface1: #45475a;   /* borders and rules only — 2:1 on the ground, never text */
+  --overlay0: #6c7086;   /* 3.7:1 — placeholders and struck-out text */
+  --overlay1: #7f849c;   /* 4.8:1 — the floor for any label small enough to read */
   --subtext0: #a6adc8;
   --text: #cdd6f4;
   --mauve: #cba6f7;
@@ -82,7 +83,7 @@ body {
   color: var(--text);
   font: inherit;
 }
-#q::placeholder { color: var(--surface1); }
+#q::placeholder { color: var(--overlay0); }
 #q:focus { border-color: var(--surface0); outline: none; width: 12rem; }
 @media (prefers-reduced-motion: no-preference) { #q { transition: width 0.2s ease; } }
 
@@ -158,7 +159,7 @@ main {
 .label {
   margin: 0 0 1rem;
   font: 400 11px/1 var(--mono);
-  color: var(--surface1);
+  color: var(--overlay1);
 }
 
 /* ── rail rows ────────────────────────────────────────── */
@@ -182,14 +183,14 @@ main {
 .row.on { background: var(--base); border-left-width: 3px; padding-left: 0.8rem; }
 .row.on .name { color: var(--text); }
 .row .name { display: block; color: var(--subtext0); }
-.sub-of { color: var(--surface1); }
+.sub-of { color: var(--overlay0); }
 
 .unpin {
   margin-left: 0.4rem;
   padding: 0 0.2rem;
   background: none;
   border: 0;
-  color: var(--surface1);
+  color: var(--overlay1);
   font: inherit;
   cursor: pointer;
 }
@@ -227,9 +228,10 @@ main {
 }
 #tick:hover { border-color: var(--green); color: var(--green); }
 #tick.go { border-color: var(--green); color: var(--crust); background: var(--green); }
-.spent { font: 400 11.5px var(--mono); color: var(--surface1); }
+.spent { font: 400 11.5px var(--mono); color: var(--overlay1); }
 
-.row-actions { display: flex; gap: 0.6rem; margin: -0.6rem 0 1.5rem; }
+.row-actions { display: flex; align-items: center; gap: 1.1rem; margin: 0 0 1.75rem; }
+.doc .row-actions { margin: 0; padding: 0.7rem 0 0.8rem; border-top: 1px solid var(--surface0); }
 .edit {
   padding: 0;
   background: none;
@@ -258,7 +260,7 @@ main {
 /* ── files ──────────────────────────────────────────────── */
 
 .files { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin: 1.5rem 0; }
-.files > em { width: 4.5rem; flex: none; font: 400 11px var(--mono); font-style: normal; color: var(--surface1); }
+.files > em { width: 4.5rem; flex: none; font: 400 11px var(--mono); font-style: normal; color: var(--overlay1); }
 
 .file {
   display: inline-flex;
@@ -274,7 +276,7 @@ main {
   cursor: pointer;
 }
 .file:hover { border-color: var(--mauve); color: var(--text); }
-.file span { color: var(--surface1); }
+.file span { color: var(--overlay0); }
 .file.add { border-style: dashed; color: var(--overlay1); }
 
 /* ── list picker ────────────────────────────────────────── */
@@ -344,17 +346,39 @@ main {
 
 /* ── detail ─────────────────────────────────────────────── */
 
-/* Line-clamp only works on plain text runs; a description with tables and code
-   blocks needs a height cap plus a fade so the cut never looks like the end. */
+/* The description is the one long-form reading area, so it gets the only surface on
+   the stage. Without it the height cap looked like a rendering fault: text simply
+   stopped mid-sentence against the page background. */
+.doc {
+  margin: 0 0 1.75rem;
+  padding: 1.15rem 1.35rem 0;
+  background: var(--mantle);
+  border-radius: 10px;
+}
+
+/* Line-clamp only works on plain text runs; a description with tables and code blocks
+   needs a height cap. The fade is an overlay, not a mask — a mask would take the
+   container's own background down with the text. */
 .desc {
-  margin: 0 0 1.25rem;
-  max-height: 9rem;
+  position: relative;
+  max-height: 13rem;
   overflow: hidden;
+  margin-bottom: 1rem;
   color: var(--subtext0);
   font-size: 0.9rem;
-  mask-image: linear-gradient(var(--crust) 65%, transparent);
 }
-.desc.all { max-height: none; mask-image: none; }
+/* Only when something is actually hidden — a gradient over a short description
+   would dim its last line for no reason. */
+.desc.clipped::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 4rem;
+  background: linear-gradient(transparent, var(--mantle));
+  pointer-events: none;
+}
+.desc.all { max-height: none; margin-bottom: 1rem; }
+.desc.all::after { content: none; }
 
 .desc > :first-child { margin-top: 0; }
 .desc > :last-child { margin-bottom: 0; }
@@ -373,7 +397,7 @@ main {
 
 .desc strong { color: var(--text); font-weight: 500; }
 .desc em { color: var(--text); font-style: italic; }
-.desc del { color: var(--surface1); }
+.desc del { color: var(--overlay0); }
 .desc a { color: var(--mauve); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--mauve) 35%, transparent); }
 
 .desc code {
@@ -396,7 +420,7 @@ main {
 
 .desc ul, .desc ol { margin: 0 0 0.9rem; padding-left: 1.2rem; }
 .desc li { margin-bottom: 0.3rem; }
-.desc li::marker { color: var(--surface1); }
+.desc li::marker { color: var(--overlay0); }
 .desc li.tick { list-style: none; margin-left: -1.2rem; }
 .desc li.tick input { accent-color: var(--green); margin-right: 0.45rem; }
 
@@ -431,7 +455,7 @@ main {
   cursor: pointer;
   text-decoration: none;
 }
-.more { margin: -1rem 0 1.25rem; display: block; }
+.more { color: var(--mauve); }
 
 .field { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.6rem; }
 
@@ -440,7 +464,7 @@ main {
   flex: none;
   font: 400 11px var(--mono);
   font-style: normal;
-  color: var(--surface1);
+  color: var(--overlay1);
 }
 
 .chip {
@@ -473,7 +497,7 @@ main {
 /* ── subtasks ───────────────────────────────────────────── */
 
 .kids { margin: 1.25rem 0 0.5rem; max-width: 62ch; }
-.kids > em { font: 400 11px var(--mono); font-style: normal; color: var(--surface1); }
+.kids > em { font: 400 11px var(--mono); font-style: normal; color: var(--overlay1); }
 .kids ul { list-style: none; margin: 0.5rem 0 0; padding: 0; }
 
 .kids li {
@@ -487,12 +511,12 @@ main {
 .kids input { accent-color: var(--green); margin: 0; flex: none; }
 .kids a { color: var(--subtext0); text-decoration: none; }
 .kids a:hover { color: var(--text); }
-.kids li:has(input:checked) a { color: var(--surface1); text-decoration: line-through; }
+.kids li:has(input:checked) a { color: var(--overlay0); text-decoration: line-through; }
 .kids .st { margin-left: auto; font: 400 10.5px var(--mono); color: var(--c); white-space: nowrap; }
 
 .notes { list-style: none; margin: 1.25rem 0 0.9rem; padding: 0; max-width: 62ch; }
 .notes li { margin-bottom: 0.8rem; font-size: 0.88rem; }
-.notes em { font: 400 10.5px var(--mono); font-style: normal; color: var(--surface1); }
+.notes em { font: 400 10.5px var(--mono); font-style: normal; color: var(--overlay1); }
 .notes p { margin: 0.15rem 0 0; color: var(--subtext0); white-space: pre-wrap; }
 
 .say { display: flex; gap: 0.5rem; max-width: 62ch; }
@@ -507,7 +531,7 @@ main {
   font: inherit;
   font-size: 0.85rem;
 }
-.say input::placeholder { color: var(--surface1); }
+.say input::placeholder { color: var(--overlay0); }
 .say button {
   padding: 0 0.9rem;
   background: none;
@@ -519,7 +543,7 @@ main {
 }
 .say button:hover { border-color: var(--mauve); color: var(--mauve); }
 
-.foot { display: flex; gap: 1.2rem; margin-top: 1.25rem; font: 400 11px var(--mono); color: var(--surface1); }
+.foot { display: flex; gap: 1.2rem; margin-top: 1.75rem; font: 400 11px var(--mono); color: var(--overlay1); }
 
 .err { color: var(--red); font: 400 11.5px var(--mono); }
 
