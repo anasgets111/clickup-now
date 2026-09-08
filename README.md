@@ -19,14 +19,16 @@ call to ClickUp and is the only thing that holds it. It binds to 127.0.0.1 only.
 
 ## What it does
 
-**Rail (left)** — your tasks, in flight first, then the rest, sorted by due date then priority.
-Any list you pin gets its own section below. Filter matches name, list, folder and tags.
+**Rail (left)** — your tasks, in flight first, then the rest. Any list you pin gets its own
+section, and `watching` adds the tasks you watch that moved this week. Filter matches name, list,
+folder and tags.
 
 **Stage (right)** — the open task. Rename it, rewrite its description in markdown, change status,
-priority and due date, tick subtasks off, attach files, post an update, start a timer.
+priority and due date, tick subtasks off, attach files, post an update, start a timer. Custom
+fields with a value are shown, and a blocked task leads with its reason.
 
-**Status bar** — how many are open, late and due today; a running timer with elapsed time; and a
-`● n changed` badge when ClickUp has moved on.
+**Status bar** — open, in flight and blocked counts (late appears only when something is); a
+running timer with elapsed time; and a `● n changed` badge when ClickUp has moved on.
 
 ### Things it does on purpose
 
@@ -36,6 +38,12 @@ priority and due date, tick subtasks off, attach files, post an update, start a 
   status colours are snapped to the nearest Catppuccin Mocha accent by hue, so they sit in the
   palette without being invented.
 - **Priority shows only when it's urgent or high.** Normal and low are noise.
+- **Sorted by priority, not by date.** Overdue first, then priority, then date. Almost nothing in
+  this workspace carries a due date, so leading with the date sorted on a value that is usually
+  absent.
+- **Blocked is a state, not a field.** Any custom field named like "Blocked Reason" with something
+  written in it marks the task, in the rail and at the top of the open task. Rename that field in
+  ClickUp and this stops noticing.
 - **Descriptions render as real markdown** — headings, tables, code, lists — clamped behind a fade
   until you ask for the rest.
 

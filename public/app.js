@@ -185,9 +185,33 @@ const PRIOS = [
 
 const shut = (t) => t.status.type === 'done' || t.status.type === 'closed';
 
+/* Custom fields. Every task carries an entry for every field on its list, nearly all
+   of them empty, so the only interesting ones are those with a value. Drop-downs store
+   an index into their own options; numbers arrive as strings. Types this cannot render
+   as a short string (labels, users, relationships) are skipped rather than guessed at. */
+function fieldText(f) {
+  const v = f.value;
+  if (v === null || v === undefined || v === '' || (Array.isArray(v) && !v.length)) return null;
+  if (f.type === 'drop_down') {
+    const opts = f.type_config?.options ?? [];
+    return (opts.find((o) => o.orderindex === v) ?? opts[v])?.name ?? null;
+  }
+  if (f.type === 'checkbox') return v === true || v === 'true' ? 'yes' : null;
+  if (f.type === 'date') return due(v);
+  if (typeof v === 'object') return null;
+  return String(v);
+}
+
+const fieldsOn = (t) => (t.custom_fields ?? []).map((f) => [f, fieldText(f)]).filter(([, v]) => v);
+
+/* ponytail: a workspace convention, not an API concept. Arsel tracks stoppages in a
+   field called "Blocked Reason"; anything named like it, with something written in it,
+   means the task is stuck. Rename the field and this stops noticing. */
+const blockedBy = (t) => (t.custom_fields ?? []).find((f) => /block/i.test(f.name) && fieldText(f));
+
 /* ── state ──────────────────────────────────────────────────────── */
 
-let me, teamId, tasks = [], picked = null, fresher = null, timer = null, ctx = null;
+let me, teamId, tasks = [], watched = [], picked = null, fresher = null, timer = null, ctx = null;
 let seen = new Map();
 let pins = JSON.parse(localStorage.getItem('pins') ?? '[]');
 const pool = new Map();          // pinned list id -> its tasks
@@ -195,12 +219,18 @@ const lists = new Map();
 const notes = new Map();
 const bodies = new Map();
 
-const everything = () => [...tasks, ...[...pool.values()].flat()];
+const everything = () => [...tasks, ...[...pool.values()].flat(), ...watched];
 const byId = (id) => everything().find((t) => t.id === id);
 
+/* Overdue first, then priority, then date. Sorting on date first read well in theory
+   but not here: almost nothing in this workspace carries a due date, so everything tied
+   on the sentinel and fell through to priority anyway. Priority is the real signal —
+   it is set on most tasks — so it leads, and a genuinely late task still jumps it. */
+const overdue = (t) => (t.due_date && Number(t.due_date) < Date.now() ? 0 : 1);
 const byUrgency = (a, b) =>
-  (a.due_date ? Number(a.due_date) : 9e15) - (b.due_date ? Number(b.due_date) : 9e15) ||
-  Number(a.priority?.id ?? 9) - Number(b.priority?.id ?? 9);
+  overdue(a) - overdue(b) ||
+  Number(a.priority?.id ?? 9) - Number(b.priority?.id ?? 9) ||
+  (a.due_date ? Number(a.due_date) : 9e15) - (b.due_date ? Number(b.due_date) : 9e15);
 
 /* ── rail ───────────────────────────────────────────────────────── */
 
@@ -213,6 +243,7 @@ function metaOf(t) {
     <span>${txt(where)}</span>
     ${t.due_date ? `<span class="${late ? 'late' : ''}">${esc(due(t.due_date))}</span>` : ''}
     ${p && p.id < 3 ? `<span class="prio" style="--p:${p.c}">&#9873; ${p.name}</span>` : ''}
+    ${blockedBy(t) ? '<span class="stuck">blocked</span>' : ''}
   </span>`;
 }
 
@@ -232,11 +263,16 @@ function renderRail() {
   ];
   const already = new Set(mine.map((t) => t.id));
   for (const p of pins) {
+    for (const t of pool.get(p.id) ?? []) already.add(t.id);
     groups.push({
       label: p.name,
       pin: p.id,
       list: (pool.get(p.id) ?? []).filter((t) => !already.has(t.id) && hit(t)).sort(byUrgency),
     });
+  }
+
+  if (watched.length) {
+    groups.push({ label: 'watching, this week', list: watched.filter((t) => !already.has(t.id) && hit(t)).sort(byUrgency) });
   }
 
   const parts = groups.filter((g) => g.list.length || g.pin).map((g) => `<div class="group">
@@ -247,13 +283,18 @@ function renderRail() {
   $('#rail').innerHTML = parts.join('') || '<p class="quiet">Nothing on you right now.</p>';
 }
 
+/* "late" and "today" sat here reading zero forever, because tasks in this workspace
+   rarely carry a due date. These three are always true of the data; late still appears,
+   but only when there is something to say. */
 function stats() {
   const late = tasks.filter((t) => t.due_date && Number(t.due_date) < Date.now()).length;
-  const today = tasks.filter((t) => t.due_date && daysOut(t.due_date) === 0).length;
+  const flight = tasks.filter((t) => t.status.type === 'custom').length;
+  const stuck = tasks.filter(blockedBy).length;
   $('#stats').innerHTML = `
     <span class="on"><i>&#9679;</i>${tasks.filter((t) => !shut(t)).length} open</span>
-    <span class="${late ? 'late' : ''}"><i>&#9650;</i>${late} late</span>
-    <span><i>&#9678;</i>${today} today</span>`;
+    <span><i>&#9680;</i>${flight} in flight</span>
+    <span class="${stuck ? 'stuck' : ''}"><i>&#8709;</i>${stuck} blocked</span>
+    ${late ? `<span class="late"><i>&#9650;</i>${late} late</span>` : ''}`;
 }
 
 /* ── stage ──────────────────────────────────────────────────────── */
@@ -300,6 +341,8 @@ async function renderStage() {
   const openStatus = list.statuses.find((s) => s.type === 'open') ?? list.statuses[0];
   const files = full.attachments ?? [];
   const src = full.markdown_description ?? '';
+  const stuck = blockedBy(full) ?? blockedBy(task);
+  const fields = fieldsOn(full).filter(([f]) => f !== stuck);
   const running = timer?.task?.id === task.id;
 
   // Local date parts, not toISOString — that shifts to UTC and can show the wrong day.
@@ -312,6 +355,8 @@ async function renderStage() {
       <button id="tick" class="${running ? 'go' : ''}">${running ? 'stop' : 'start'} timer</button>
       ${full.time_spent ? `<span class="spent">${clocked(full.time_spent)} logged</span>` : ''}
     </div>
+
+    ${stuck ? `<p class="stuck-note"><b>blocked</b>${txt(fieldText(stuck))}</p>` : ''}
 
     <div id="body"></div>
 
@@ -330,6 +375,9 @@ async function renderStage() {
       <button class="chip" data-do="due" data-v="today" style="--c:var(--overlay1)">today</button>
       <button class="chip" data-do="due" data-v="" style="--c:var(--overlay1)" ${dueVal ? '' : 'disabled'}>clear</button>
     </div>
+
+    ${fields.length ? `<div class="field"><em>fields</em>${fields.map(([f, v]) => `
+      <span class="pill">${txt(f.name)}<b>${txt(v)}</b></span>`).join('')}</div>` : ''}
 
     ${kids.length ? `<div class="kids">
       <em>${done} of ${kids.length} done</em>
@@ -628,16 +676,24 @@ async function pages(path, extra = {}) {
 async function fetchAll() {
   const q = new URLSearchParams({ order_by: 'due_date' });
   q.append('assignees[]', me.id);
+  // You watch 100+ tasks, which is not a list anyone can read. Narrow it server-side to
+  // the ones that actually moved this week — date_updated_gt cuts it to about a third.
+  const w = new URLSearchParams({ order_by: 'updated', reverse: 'true', subtasks: 'false',
+    date_updated_gt: String(Date.now() - 7 * 864e5) });
+  w.append('watchers[]', me.id);
+
   // Top-level only for a pinned list: subtasks belong inside their parent, not as peers.
-  const [mine, extra] = await Promise.all([
+  const [mine, extra, seenAlso] = await Promise.all([
     pages(`/team/${teamId}/task`, Object.fromEntries(q)),
     Promise.all(pins.map(async (p) => [p.id, await pages(`/list/${p.id}/task`, { subtasks: 'false' })])),
+    $('#watch').checked ? pages(`/team/${teamId}/task`, Object.fromEntries(w)) : [],
   ]);
-  return { mine, extra };
+  return { mine, extra, watched: seenAlso };
 }
 
-function adopt({ mine, extra }) {
+function adopt({ mine, extra, watched: seenAlso }) {
   tasks = mine;
+  watched = seenAlso ?? [];
   pool.clear();
   for (const [id, list] of extra) pool.set(id, list);
   seen = new Map(everything().map((t) => [t.id, t.date_updated]));
@@ -666,7 +722,7 @@ const reload = () => load().catch((err) => { $('#stats').innerHTML = `<span clas
 async function poll() {
   if (document.hidden || !teamId) return;
   const fresh = await fetchAll();
-  const all = [fresh.mine, ...fresh.extra.map(([, l]) => l)].flat();
+  const all = [fresh.mine, fresh.watched ?? [], ...fresh.extra.map(([, l]) => l)].flat();
   const changed = all.filter((t) => seen.get(t.id) !== t.date_updated).length;
   const gone = everything().filter((t) => !all.some((f) => f.id === t.id)).length;
   const restyled = await statusesMoved();
@@ -704,13 +760,14 @@ let typing;
 $('#q').addEventListener('input', () => { clearTimeout(typing); typing = setTimeout(renderRail, 120); });
 $('#refresh').addEventListener('click', reload);
 $('#closed').addEventListener('change', reload);
+$('#watch').addEventListener('change', reload);
 
 // Console handle. `now.preview(3)` shows the change badge without touching ClickUp;
 // `now.poll()` checks straight away instead of waiting out the 90s tick.
 window.now = {
   poll,
   preview(n = 2) {
-    fresher = { mine: tasks, extra: [...pool.entries()] };
+    fresher = { mine: tasks, extra: [...pool.entries()], watched };
     $('#news').textContent = `${n} changed`;
     $('#news').hidden = false;
   },

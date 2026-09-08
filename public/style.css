@@ -75,6 +75,7 @@ body {
 .stats span { font-variant-numeric: tabular-nums; }
 .stats .on { color: var(--text); }
 .stats .late { color: var(--red); }
+.stats .stuck { color: var(--peach); }
 
 .tools { display: flex; align-items: center; gap: 0.85rem; margin-left: auto; }
 
@@ -342,6 +343,41 @@ main {
 .meta .st { color: var(--c); }
 .meta .late { color: var(--red); }
 .meta .prio { color: var(--p); }
+
+/* Blocked is a state you should be able to read without opening anything, so it gets
+   a colour of its own rather than another grey word in the meta line. */
+.meta .stuck {
+  padding: 0.05rem 0.4rem;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--peach) 16%, transparent);
+  color: var(--peach);
+}
+
+.stuck-note {
+  display: flex;
+  gap: 0.7rem;
+  max-width: var(--read);
+  margin: 0 0 1.5rem;
+  padding: 0.7rem 0.9rem;
+  border-left: 2px solid var(--peach);
+  border-radius: 0 6px 6px 0;
+  background: color-mix(in srgb, var(--peach) 8%, transparent);
+  color: var(--subtext0);
+  font-size: 0.87rem;
+}
+.stuck-note b { flex: none; color: var(--peach); font: 400 11px/1.6 var(--mono); }
+
+.pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  padding: 0.22rem 0.7rem;
+  border: 1px solid var(--surface0);
+  border-radius: 999px;
+  font: 400 11.5px var(--mono);
+  color: var(--overlay1);
+}
+.pill b { font-weight: 400; color: var(--subtext0); }
 
 .tag {
   padding: 0.1rem 0.4rem;
