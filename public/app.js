@@ -213,8 +213,8 @@ const blockedBy = (t) => (t.custom_fields ?? []).find((f) => /block/i.test(f.nam
 
 /* ── state ──────────────────────────────────────────────────────── */
 
-let me, teamId, tasks = [], watched = [], picked = null, fresher = null, timer = null, ctx = null;
-let seen = new Map();
+let me, teamId, tasks = [], watched = [], picked = null, timer = null, ctx = null;
+let watermark = 0;   // newest date_updated we hold; the poll asks for anything after it
 let pins = JSON.parse(localStorage.getItem('pins') ?? '[]');
 const pool = new Map();          // pinned list id -> its tasks
 const lists = new Map();
@@ -330,7 +330,7 @@ async function patch(task, body) {
   const updated = await api(`/task/${task.id}`, { method: 'PUT', body: JSON.stringify(body) });
 
   Object.assign(task, updated);          // the object the rail and the stage render from
-  seen.set(task.id, updated.date_updated); // or the next poll reports your own edit back
+  watermark = Math.max(watermark, Number(updated.date_updated) || 0); // not your own edit
 
   if (bodies.has(task.id)) {
     const held = await bodies.get(task.id);
@@ -750,8 +750,8 @@ function adopt({ mine, extra, watched: alsoWatched }) {
   watched = alsoWatched ?? [];
   pool.clear();
   for (const [id, list] of extra) pool.set(id, list);
-  seen = new Map(everything().map((t) => [t.id, t.date_updated]));
-  fresher = null;
+  const newest = everything().reduce((n, t) => Math.max(n, Number(t.date_updated) || 0), 0);
+  watermark = newest || Date.now();
   $('#news').hidden = true;
   notes.clear();
   bodies.clear();
@@ -771,19 +771,30 @@ const load = async () => adopt(await fetchAll());
 const reload = () => load().catch((err) => { $('#stats').innerHTML = `<span class="err">${esc(err.message)}</span>`; });
 
 /* Poll quietly and say that something moved, but never move it. Re-rendering under
-   someone who is mid-sentence is the thing this app exists to avoid, so the new data
-   waits in `fresher` until the badge is clicked. */
+   someone who is mid-sentence is the thing this app exists to avoid.
+
+   This asks a question rather than fetching an answer: "anything updated after the
+   newest thing I hold?" When nothing has, ClickUp replies with 32 bytes instead of the
+   22KB the full list used to cost, forty times an hour. The badge does the real fetch,
+   once, when you click it.
+
+   What this cannot see is a task leaving you — unassigned or deleted — because the
+   query filters by assignee, so it simply does not come back. Refresh corrects it. */
 async function poll() {
   if (document.hidden || !teamId) return;
-  const fresh = await fetchAll();
-  const all = [fresh.mine, fresh.watched ?? [], ...fresh.extra.map(([, l]) => l)].flat();
-  const live = new Set(all.map((t) => t.id));
-  const changed = all.filter((t) => seen.get(t.id) !== t.date_updated).length;
-  const gone = everything().filter((t) => !live.has(t.id)).length;
-  const restyled = await statusesMoved();
-  if (!(changed + gone + restyled)) return;
-  fresher = fresh;
-  $('#news').textContent = `${changed + gone + restyled} changed`;
+  // date_updated_gt is inclusive despite the name: passing the watermark itself returns
+  // the task that set it, so the badge would read "1 changed" forever. Measured, not
+  // assumed — watermark returns 1 task and 19KB, watermark + 1 returns none and 32 bytes.
+  const since = { date_updated_gt: watermark + 1, subtasks: 'false' };
+  const asked = [
+    pages(`/team/${teamId}/task`, { 'assignees[]': me.id, ...since }),
+    ...pins.map((p) => pages(`/list/${p.id}/task`, since)),
+    ...($('#watch').checked ? [pages(`/team/${teamId}/task`, { 'watchers[]': me.id, ...since })] : []),
+  ];
+  const moved = new Set((await Promise.all(asked)).flat().map((t) => t.id));
+  const n = moved.size + await statusesMoved();
+  if (!n) return;
+  $('#news').textContent = `${n} changed`;
   $('#news').hidden = false;
 }
 
@@ -809,7 +820,7 @@ setInterval(() => poll().catch(() => {}), 90_000);
 setInterval(() => !document.hidden && tick(), 60_000);
 // Coming back to the tab is exactly when a stale clock would be visible.
 document.addEventListener('visibilitychange', () => !document.hidden && tick());
-$('#news').addEventListener('click', () => fresher && adopt(fresher));
+$('#news').addEventListener('click', reload);
 
 let typing;
 $('#q').addEventListener('input', () => { clearTimeout(typing); typing = setTimeout(renderRail, 120); });
@@ -822,7 +833,6 @@ $('#watch').addEventListener('change', reload);
 window.now = {
   poll,
   preview(n = 2) {
-    fresher = { mine: tasks, extra: [...pool.entries()], watched };
     $('#news').textContent = `${n} changed`;
     $('#news').hidden = false;
   },

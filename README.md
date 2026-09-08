@@ -63,6 +63,11 @@ running timer with elapsed time; and a `● n changed` badge when ClickUp has mo
   every cached list definition.
 - Rate limit is 100 requests/minute on your plan. A poll costs one request, plus one per pinned
   list, plus one for the open task's list — so a dozen pins would need rethinking.
+- The poll asks a question rather than fetching an answer: anything updated after the newest
+  thing already held. Idle, that is 32 bytes. The badge does the real fetch when clicked. The
+  cost is that a task leaving you — unassigned or deleted — is invisible until you refresh,
+  because the query filters by assignee so it simply does not come back.
+- `date_updated_gt` is inclusive despite the name, so the watermark is passed with a +1.
 - An update is answered with the whole task, so an edit is one request. Opening a task is three
   (list, comments, task) and they are cached until you refresh.
 
