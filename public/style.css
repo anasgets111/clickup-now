@@ -4,9 +4,9 @@
   --mantle: #181825;
   --base: #1e1e2e;
   --surface0: #313244;
-  --surface1: #45475a;   /* borders and rules only — 2:1 on the ground, never text */
-  --overlay0: #6c7086;   /* 3.7:1 — placeholders and struck-out text */
-  --overlay1: #7f849c;   /* 4.8:1 — the floor for any label small enough to read */
+  --surface1: #45475a;   /* borders and rules only. 2:1 on the ground, never text */
+  --overlay0: #6c7086;   /* 3.7:1, placeholders and struck-out text */
+  --overlay1: #7f849c;   /* 4.8:1, the floor for any label small enough to read */
   --subtext0: #a6adc8;
   --text: #cdd6f4;
   --mauve: #cba6f7;
@@ -20,7 +20,7 @@
 
   --c: var(--overlay1);
   /* One reading measure for the whole stage. It was set per element in ch, which
-     resolves to a different width in each because the font sizes differ — and never
+     resolves to a different width in each because the font sizes differ, and never
      on the container, so the surface stretched the full pane while its text stopped
      at 62 characters. */
   --read: 42rem;
@@ -177,7 +177,7 @@ main {
 
 /* The stage was one measure-wide column with the rest of the pane left empty. Widening
    the text would have pushed lines past a comfortable length, so the space goes to a
-   properties column instead — which also lifts the controls above a long subtask list
+   properties column instead, which also lifts the controls above a long subtask list
    rather than burying them under it. */
 #stage { display: grid; gap: 2.5rem; }
 
@@ -452,9 +452,8 @@ main {
 
 /* ── detail ─────────────────────────────────────────────── */
 
-/* The description is the one long-form reading area, so it gets the only surface on
-   the stage. Without it the height cap looked like a rendering fault: text simply
-   stopped mid-sentence against the page background. */
+/* The one long-form reading area, so it gets the only surface on the stage. Without it
+   the height cap reads as a rendering fault, text stopping mid-sentence against nothing. */
 .doc {
   margin: 0 0 1.75rem;
   max-width: var(--read);
@@ -464,7 +463,7 @@ main {
 }
 
 /* Line-clamp only works on plain text runs; a description with tables and code blocks
-   needs a height cap. The fade is an overlay, not a mask — a mask would take the
+   needs a height cap. The fade is an overlay, not a mask. A mask would take the
    container's own background down with the text. */
 .desc {
   position: relative;
@@ -474,7 +473,7 @@ main {
   color: var(--subtext0);
   font-size: 0.95rem;
 }
-/* Only when something is actually hidden — a gradient over a short description
+/* Only when something is hidden, a gradient over a short description
    would dim its last line for no reason. */
 .desc.clipped::after {
   content: '';

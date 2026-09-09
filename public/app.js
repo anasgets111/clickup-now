@@ -17,9 +17,8 @@ async function upload(path, form) {
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const low = (s) => String(s).toLowerCase();
 
-// ClickUp stores names already HTML-escaped — a task really does come back as
-// "testimonials &amp; partners". Escaping that again renders the entity literally,
-// so decode once first. Names sent BACK to the API (status values) must stay raw.
+// Names arrive HTML-escaped: `testimonials &amp; partners` literally. Decode once for
+// display. Status names sent back to the API stay raw.
 const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
 const unent = (s) => String(s ?? '').replace(/&(?:#(\d+)|#x([\da-f]+)|(\w+));/gi,
   (m, dec, hex, word) => dec ? String.fromCharCode(+dec)
@@ -28,16 +27,14 @@ const unent = (s) => String(s ?? '').replace(/&(?:#(\d+)|#x([\da-f]+)|(\w+));/gi
 const txt = (s) => esc(unent(s));
 
 /* ── markdown ────────────────────────────────────────────────────────
-   A subset renderer for what ClickUp descriptions actually contain:
-   headings, fenced code, tables, lists, blockquotes, and inline
+   Headings, fenced code, tables, lists, blockquotes, and inline
    bold/italic/code/strike/links.
 
-   Everything is escaped before a single rule runs, so raw HTML in a
-   description (ClickUp does emit some) renders as visible text and can
-   never execute. That is what makes this safe without a sanitiser.
+   Everything is escaped before any rule runs, so raw HTML in a description
+   shows as text and cannot execute. That is why there is no sanitiser.
 
-   ponytail: lists are flat. Nested bullets render at one level. If a
-   spec needs real nesting, track indent on a stack in md(). */
+   ponytail: lists are flat, one level of nesting. Track indent on a stack
+   in md() if a spec ever needs more. */
 
 function inline(t, keep) {
   const hold = (s) => `\u0000${keep.push(s) - 1}\u0000`;
@@ -101,9 +98,8 @@ function md(src) {
     } else if (!ln.trim()) {
       i++;
     } else {
-      // Takes the current line unconditionally. Consuming it inside the loop instead
-      // would spin forever on a line that starts a block but matched no rule above —
-      // a `|` row with no separator under it, a bare `--`, a `#tag` with no space.
+      // Consume the current line unconditionally. Inside the loop, a line that starts a
+      // block but matched no rule spins forever: `|` with no separator, `--`, `#tag`.
       const body = [lines[i++]];
       for (; i < lines.length && lines[i].trim() && !/^\s*(?:[-*+>#]|\d+\.|\||```)/.test(lines[i]); i++) body.push(lines[i]);
       out.push(`<p>${inline(body.join(' '), keep)}</p>`);
@@ -114,13 +110,11 @@ function md(src) {
 }
 
 /* ── Catppuccin Mocha ────────────────────────────────────────────────
-   ClickUp status colours come from ClickUp's own palette and clash badly
-   with Mocha, so snap each one to its nearest accent by hue. Anything
-   near-grey stays grey rather than picking up a hue it never had. */
+   ClickUp's status colours clash with Mocha, so snap each to its nearest
+   accent by hue. Near-grey stays grey. */
 
-// Rosewater, flamingo and maroon are left out on purpose. They crowd the hues around
-// red without being tellable apart from it, so they only steal true reds. What is left
-// is the set a person can actually distinguish at pip size.
+// Rosewater, flamingo and maroon are left out: they crowd the hues around red without
+// being tellable apart from it, so they only steal true reds.
 const MOCHA = ['#f38ba8', '#fab387', '#f9e2af', '#a6e3a1', '#94e2d5', '#89dceb',
   '#74c7ec', '#89b4fa', '#b4befe', '#cba6f7', '#f5c2e7'];
 
@@ -140,8 +134,8 @@ function snap(hex) {
   if (!/^#[0-9a-f]{6}$/i.test(hex ?? '')) return '#7f849c';
   if (!snapped.has(hex)) {
     const { h, s, l } = hsl(hex);
-    // Mocha's accents all sit at one lightness and differ only in hue, so match on
-    // hue alone. RGB distance would drag every dark saturated colour onto a grey.
+    // Mocha accents share one lightness and differ only in hue. RGB distance would drag
+    // every dark saturated colour onto a grey.
     const near = HUES.reduce((best, x) => {
       const d = Math.min(Math.abs(x.h - h), 360 - Math.abs(x.h - h));
       return d < best.d ? { c: x.c, d } : best;
@@ -187,10 +181,9 @@ const PRIOS = [
 const shut = (t) => t.status.type === 'done' || t.status.type === 'closed';
 const late = (t) => Boolean(t.due_date) && Number(t.due_date) < Date.now();
 
-/* Custom fields. Every task carries an entry for every field on its list, nearly all
-   of them empty, so the only interesting ones are those with a value. Drop-downs store
-   an index into their own options; numbers arrive as strings. Types this cannot render
-   as a short string (labels, users, relationships) are skipped rather than guessed at. */
+/* A task carries an entry for every field on its list, nearly all empty, so only ones
+   with a value matter. A drop-down stores its option's orderindex, numbers arrive as
+   strings, and types with no short string form (labels, users) are skipped. */
 function fieldText(f) {
   const v = f.value;
   if (v === null || v === undefined || v === '' || (Array.isArray(v) && !v.length)) return null;
@@ -208,9 +201,8 @@ const pct = (done, total) => `${Math.round((done / total) * 100)}%`;
 
 const fieldsOn = (t) => (t.custom_fields ?? []).map((f) => [f, fieldText(f)]).filter(([, v]) => v);
 
-/* ponytail: a workspace convention, not an API concept. Arsel tracks stoppages in a
-   field called "Blocked Reason"; anything named like it, with something written in it,
-   means the task is stuck. Rename the field and this stops noticing. */
+/* ponytail: a workspace convention, not an API concept. Any field named like "Blocked
+   Reason" with text in it means stuck. Rename it and this stops noticing. */
 const blockedBy = (t) => (t.custom_fields ?? []).find((f) => /block/i.test(f.name) && fieldText(f));
 
 /* ── state ──────────────────────────────────────────────────────── */
@@ -218,8 +210,8 @@ const blockedBy = (t) => (t.custom_fields ?? []).find((f) => /block/i.test(f.nam
 let me, teamId, tasks = [], watched = [], picked = null, timer = null, ctx = null;
 let watermark = 0;   // newest date_updated we hold; the poll asks for anything after it
 
-/* The bar counters double as lenses. One at a time — clicking the active one clears it —
-   because two overlapping filters is a state you have to reason about rather than read. */
+/* The bar counters double as lenses. One at a time, and clicking the active one clears
+   it. Two overlapping filters is a state you reason about rather than read. */
 let lens = null;
 const LENSES = {
   open: (t) => !shut(t),
@@ -237,10 +229,8 @@ const bodies = new Map();
 const everything = () => [...tasks, ...[...pool.values()].flat(), ...watched];
 const byId = (id) => everything().find((t) => t.id === id);
 
-/* Overdue first, then priority, then date. Sorting on date first read well in theory
-   but not here: almost nothing in this workspace carries a due date, so everything tied
-   on the sentinel and fell through to priority anyway. Priority is the real signal —
-   it is set on most tasks — so it leads, and a genuinely late task still jumps it. */
+/* Overdue, then priority, then date. Almost nothing here carries a due date, so date
+   first would sort on a mostly absent value. Priority is set on most tasks. */
 const byUrgency = (a, b) =>
   Number(late(b)) - Number(late(a)) ||
   Number(a.priority?.id ?? 9) - Number(b.priority?.id ?? 9) ||
@@ -285,9 +275,8 @@ function renderRail() {
     { label: 'in flight', list: mine.filter((t) => t.status.type === 'custom') },
     { label: q ? 'matching' : 'mine', list: mine.filter((t) => t.status.type !== 'custom') },
   ];
-  // Each group claims its tasks, then adds them to `already` so later groups do not
-  // repeat them. Claiming has to come first: adding a pin's tasks before filtering that
-  // same pin excluded every one of them, and a pinned list rendered empty.
+  // Each group claims its tasks, then adds them to `already` so later groups skip them.
+  // Claiming first matters: add a pin's tasks before filtering that pin and it renders empty.
   const already = new Set(mine.map((t) => t.id));
   const claim = (from) => {
     const got = from.filter((t) => !already.has(t.id) && hit(t)).sort(byUrgency);
@@ -307,17 +296,14 @@ function renderRail() {
     || `<p class="quiet">${lens || q ? 'Nothing matches that.' : 'Nothing on you right now.'}</p>`;
 }
 
-/* "late" and "today" sat here reading zero forever, because tasks in this workspace
-   rarely carry a due date. These three are always true of the data; late still appears,
-   but only when there is something to say. */
+/* Counters that are true of this data. Tasks here rarely carry a due date, so late
+   appears only when something is. */
 function stats() {
   const overdue = tasks.filter(late).length;
   const flight = tasks.filter((t) => t.status.type === 'custom').length;
   const stuck = tasks.filter(blockedBy).length;
-  // ClickUp has two finished types and include_closed only gates one: a `done` status
-  // ("complete") always comes back, a `closed` one ("cancelled") does not unless the
-  // toggle is on. So this counts what is actually here, appears only when there is
-  // something to count, and a lens left pointing at nothing clears itself.
+  // include_closed gates `closed` ("cancelled") only; `done` ("complete") always returns.
+  // So this counts what is here, and a lens pointing at nothing clears itself.
   const done = tasks.filter(shut).length;
   if (lens === 'done' && !done) lens = null;
 
@@ -335,8 +321,7 @@ function stats() {
 
 /* ── stage ──────────────────────────────────────────────────────── */
 
-// Caches hold the promise, not the result, so two callers racing the same id share
-// one request instead of firing two.
+// Cache the promise, not the result, so racing callers share one request.
 function once(map, key, make) {
   if (!map.has(key)) map.set(key, make());
   return map.get(key);
@@ -344,15 +329,12 @@ function once(map, key, make) {
 
 const listOf = (id) => once(lists, id, () => api(`/list/${id}`));
 const notesOf = (id) => once(notes, id, () => api(`/task/${id}/comment`));
-// The list endpoint flattens markdown away — description and text_content come back
-// identical and stripped. markdown_description only exists on the single-task fetch.
+// description and text_content come back markdown-stripped and identical.
+// markdown_description exists only on the single-task fetch.
 const bodyOf = (id) => once(bodies, id, () => api(`/task/${id}?include_markdown_description=true&include_subtasks=true`));
 
-/* ClickUp answers an update with the whole task — every field the full fetch carries
-   except markdown_description, subtasks and attachments included. So an edit needs one
-   request, not five: this used to PUT, then reload the workspace, then let adopt() clear
-   the caches, which made the next render refetch the list, the comments and the 51KB
-   task again. Merging the reply costs nothing. */
+/* The update reply is the whole task except markdown_description, subtasks and
+   attachments included. Merging it makes an edit one request instead of five. */
 async function patch(task, body) {
   const updated = await api(`/task/${task.id}`, { method: 'PUT', body: JSON.stringify(body) });
 
@@ -361,7 +343,7 @@ async function patch(task, body) {
 
   if (bodies.has(task.id)) {
     const held = await bodies.get(task.id);
-    // The reply omits markdown_description, so keep the copy we hold — unless this edit
+    // The reply omits markdown_description, so keep the copy we hold. Unless this edit
     // is what changed it, in which case what we sent is the truth.
     const merged = { ...held, ...updated };
     if (body.markdown_content !== undefined) merged.markdown_description = body.markdown_content;
@@ -390,7 +372,7 @@ async function renderStage() {
   if (picked !== task.id) return;   // something else was clicked while we waited
 
   // ponytail: subtasks carry no list of their own in this payload, so they are assumed
-  // to share the parent's list — true for every subtask ClickUp lets you create today.
+  // to share the parent's list, true for every subtask ClickUp lets you create today.
   const kids = full.subtasks ?? [];
   const done = kids.filter(shut).length;
   const shutStatus = list.statuses.find((s) => s.type === 'done') ?? list.statuses.at(-1);
@@ -401,13 +383,12 @@ async function renderStage() {
   const fields = fieldsOn(full).filter(([f]) => f !== stuck);
   const running = timer?.task?.id === task.id;
 
-  // Local date parts, not toISOString — that shifts to UTC and can show the wrong day.
+  // Local date parts, not toISOString. That one shifts to UTC and can show the wrong day.
   const d = task.due_date && new Date(Number(task.due_date));
   const dueVal = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : '';
 
-  /* Two children, two columns: everything you read and write on the left at the
-     reading measure, the short controls on the right. Below 1400px they stack and it
-     is the same page it always was. */
+  /* Two children, two columns: what you read and write on the left at the reading
+     measure, the short controls on the right. Below 1400px they stack. */
   stage.innerHTML = `
     <div class="col">
       <textarea id="title" rows="1" spellcheck="false" aria-label="Task name">${txt(task.name)}</textarea>
@@ -473,9 +454,8 @@ async function renderStage() {
   ctx = { task, list, kids, shutStatus, openStatus, src };
 }
 
-/* A task name is a heading, so it has to wrap at the reading measure like everything
-   else on the stage. An <input> would have scrolled sideways instead, and names here run
-   past 50 characters. */
+/* A name is a heading, so it wraps at the reading measure. An <input> would scroll
+   sideways instead, and names here run past 50 characters. */
 const fit = (el, cap = Infinity) => {
   el.style.height = 'auto';
   el.style.height = `${Math.min(el.scrollHeight + 2, cap)}px`;
@@ -501,19 +481,17 @@ function showBody(src, editing = false) {
     : `<div class="row-actions"><button class="edit">add a description</button></div>`;
   const desc = el.querySelector('.desc');
   const more = el.querySelector('.more');
-  // Only offer the toggle when there is actually something hidden behind the fade.
+  // Only offer the toggle when there is something hidden behind the fade.
   if (desc && more && desc.scrollHeight > desc.clientHeight + 4) {
     more.hidden = false;
     desc.classList.add('clipped');
   }
 }
 
-/* Listeners are delegated and registered once. Binding them inside renderStage would
-   stack a new handler on #stage for every task opened, so one chip click would fire
-   as many updates as tasks you had viewed. `ctx` carries what the open task needs. */
+/* Delegated and registered once. Binding inside renderStage stacks a handler on #stage
+   per task opened, so one chip click fires that many updates. `ctx` carries the open task. */
 
-/* Shows a button as working, and puts its label back if the call fails — otherwise a
-   failed update leaves an ellipsis sitting there for good. */
+/* Marks a button working, and restores its label if the call fails. */
 async function busy(b, run, what) {
   const was = b.textContent;
   b.textContent = '…';
@@ -521,8 +499,7 @@ async function busy(b, run, what) {
   try { await run(); } catch (err) { fail(err, what); b.textContent = was; b.disabled = false; }
 }
 
-/* The non-button counterpart to busy(): every edit here is "do it, or say what did not
-   change". */
+/* The non-button counterpart to busy(). */
 const tryTo = (what, run) => run().catch((err) => fail(err, what));
 
 function fail(err, what) {
@@ -655,8 +632,8 @@ function paintClock() {
   const el = $('#clock');
   el.hidden = !timer;
   if (!timer) return;
-  // Rebuild only when the entry changes; the elapsed time is a text node updated in
-  // place, so this does not re-parse HTML every second.
+  // Rebuild only when the entry changes. Elapsed time is a text node updated in place,
+  // so this does not re-parse HTML every second.
   if (el.dataset.entry !== timer.id) {
     el.dataset.entry = timer.id;
     el.innerHTML = `<i>&#9678;</i><span class="elapsed"></span> <b>${txt(timer.task?.name ?? 'running')}</b>`;
@@ -758,8 +735,8 @@ async function pages(path, extra = {}) {
 }
 
 async function fetchAll() {
-  // You watch 100+ tasks, which is not a list anyone can read. Narrowed server-side to
-  // the ones that moved this week — date_updated_gt cuts it to about a third.
+  // You watch 100+ tasks. date_updated_gt narrows it server-side to those that moved
+  // this week, about a third.
   const watching = { order_by: 'updated', reverse: 'true', subtasks: 'false',
     date_updated_gt: Date.now() - 7 * 864e5, 'watchers[]': me.id };
 
@@ -782,8 +759,8 @@ function adopt({ mine, extra, watched: alsoWatched }) {
   $('#news').hidden = true;
   notes.clear();
   bodies.clear();
-  // Statuses live on the list, not the task, so a status added or recoloured in ClickUp
-  // is invisible until this is dropped. One refetch per list, on the next task opened.
+  // Statuses live on the list, so one added or recoloured is invisible until this drops.
+  // Costs one refetch per list, on the next task opened.
   lists.clear();
   if (!byId(picked)) {
     const order = [...mine].sort(byUrgency);
@@ -797,21 +774,16 @@ function adopt({ mine, extra, watched: alsoWatched }) {
 const load = async () => adopt(await fetchAll());
 const reload = () => load().catch((err) => { $('#stats').innerHTML = `<span class="err">${esc(err.message)}</span>`; });
 
-/* Poll quietly and say that something moved, but never move it. Re-rendering under
-   someone who is mid-sentence is the thing this app exists to avoid.
+/* Ask whether anything changed, do not fetch what changed. Idle that is 32 bytes
+   against 22KB for a full list, forty times an hour. The badge does the real fetch on
+   click, so nothing re-renders under you.
 
-   This asks a question rather than fetching an answer: "anything updated after the
-   newest thing I hold?" When nothing has, ClickUp replies with 32 bytes instead of the
-   22KB the full list used to cost, forty times an hour. The badge does the real fetch,
-   once, when you click it.
-
-   What this cannot see is a task leaving you — unassigned or deleted — because the
-   query filters by assignee, so it simply does not come back. Refresh corrects it. */
+   Blind spot: a task leaving you, unassigned or deleted, never comes back from a query
+   filtered by assignee. Refresh corrects it. */
 async function poll() {
   if (document.hidden || !teamId) return;
-  // date_updated_gt is inclusive despite the name: passing the watermark itself returns
-  // the task that set it, so the badge would read "1 changed" forever. Measured, not
-  // assumed — watermark returns 1 task and 19KB, watermark + 1 returns none and 32 bytes.
+  // date_updated_gt is inclusive despite the name. The watermark itself returns the task
+  // that set it, 19KB of it; watermark + 1 returns none and 32 bytes.
   const since = { date_updated_gt: watermark + 1, subtasks: 'false' };
   const asked = [
     pages(`/team/${teamId}/task`, { 'assignees[]': me.id, ...since }),
@@ -825,9 +797,8 @@ async function poll() {
   $('#news').hidden = false;
 }
 
-/* The open task's own list, checked once a cycle. A status added, renamed or recoloured
-   in ClickUp changes the chips you would click, and nothing in the task payload reveals
-   it. Costs one request per poll, and only while a task is open. */
+/* The open task's list, once a cycle. A status added or recoloured changes the chips you
+   would click and no task payload reveals it. One request, only while a task is open. */
 async function statusesMoved() {
   const id = ctx?.task?.list?.id;
   if (!id || !lists.has(id)) return 0;

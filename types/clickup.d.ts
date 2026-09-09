@@ -1,5 +1,5 @@
-/* The slice of ClickUp's API this app actually touches, written from real payloads
-   rather than from the docs — several fields are here because a response surprised me.
+/* The slice of ClickUp's API this app touches, written from real payloads
+   rather than from the docs. Several fields are here because a response surprised me.
    Anything not described here is deliberately absent, not forgotten. */
 
 /** A status belongs to the list, not the task. `type` is the only reliable signal for
@@ -88,7 +88,7 @@ export interface Task {
   text_content?: string;
 
   /** Only on GET /task/{id}?include_markdown_description=true. Never on a list fetch,
-   *  and absent from the reply to an update — which is why patch() keeps the copy it
+   *  and absent from the reply to an update, which is why patch() keeps the copy it
    *  holds unless the edit is what changed it. */
   markdown_description?: string;
 

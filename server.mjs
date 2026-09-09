@@ -21,18 +21,15 @@ const OURS = ['http://localhost:4400', 'http://127.0.0.1:4400'];
 
 /** @param {IncomingMessage} req @param {ServerResponse} res */
 async function proxy(req, res) {
-  // This server holds a token that can change a whole company's workspace, and any
-  // page in the browser can reach 127.0.0.1. CORS stops such a page READING a reply,
-  // but a no-cors POST still fires — enough to stop a timer or post a comment. A
-  // cross-site request always carries its own Origin, so refuse those; same-origin
-  // ones either omit the header or send one of ours.
+  // Any page in the browser can reach 127.0.0.1, and this holds a token that can change
+  // the workspace. CORS blocks reading a reply, but a no-cors POST still fires. Refuse a
+  // foreign Origin; same-origin requests omit the header or send one of ours.
   const from = req.headers.origin;
   if (from && !OURS.includes(from)) return res.writeHead(403).end('{}');
 
   const chunks = [];
   for await (const c of req) chunks.push(c);
-  // Pass the caller's content-type through rather than forcing JSON: file uploads are
-  // multipart and the boundary lives in that header.
+  // Pass the caller's content-type through. Uploads are multipart and carry the boundary.
   /** @type {Record<string, string>} */
   const headers = { Authorization: TOKEN };
   if (req.headers['content-type']) headers['content-type'] = req.headers['content-type'];
@@ -46,12 +43,11 @@ async function proxy(req, res) {
 }
 
 createServer(async (req, res) => {
-  // Node types url as optional; it is always set for a server, but reading it once
-  // means the rest of this function does not have to care.
+  // Node types url as optional. Read it once so the rest does not care.
   const url = req.url ?? '/';
   if (url.startsWith('/api/')) {
-    // headersSent guard: if the upstream body fails mid-read the status is already
-    // out, and a second writeHead would throw and take the server down.
+    // If the upstream body fails mid-read the status is already out, and a second
+    // writeHead would throw and take the server down.
     return proxy(req, res).catch(() => {
       if (!res.headersSent) res.writeHead(502, { 'content-type': 'application/json' });
       res.end('{}');

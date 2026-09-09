@@ -1,99 +1,73 @@
 # Now
 
-A calm front end for the ClickUp tasks assigned to you. One list on the left, one open task on
-the right, and nothing on screen that isn't yours.
-
-Built because ClickUp's own list view puts a whole company's work in front of you at once.
+ClickUp tasks assigned to you. Task list left, open task right. Built because ClickUp's own list
+view puts a whole company's work on screen at once.
 
 ## Setup
 
-1. In ClickUp: avatar (bottom left) → Settings → Apps → Generate a personal API token. It starts
-   with `pk_`.
-2. `cp .env.example .env` and paste the token in.
-3. `node server.mjs`, then open http://localhost:4400
+```sh
+cp .env.example .env   # paste a personal token: ClickUp avatar, Settings, Apps
+node server.mjs        # http://localhost:4400
+```
 
-No runtime dependencies, no build step, four files. Needs Node 20.12+ for `process.loadEnvFile`.
-`npm install` only fetches the type checker; the app itself needs nothing.
+Four files, `server.mjs` plus three in `public/`. No runtime dependencies, no build step. Node
+20.12+ for `process.loadEnvFile`. `npm install` fetches the type checker and nothing else.
 
-The token lives in `.env` (gitignored) and never reaches the browser — `server.mjs` proxies every
-call to ClickUp and is the only thing that holds it. It binds to 127.0.0.1 only.
+`server.mjs` holds the token and proxies every call, so the browser never sees it. It binds to
+127.0.0.1 and rejects any request carrying a foreign `Origin`, because any page you visit can
+reach localhost and a no-cors POST would otherwise land.
 
-## What it does
+## Layout
 
-**Rail (left)** — your tasks, in flight first, then the rest. Any list you pin gets its own
-section, and `watching` adds the tasks you watch that moved this week. Filter matches name, list,
-folder and tags.
+| | |
+|---|---|
+| Rail, left | Your tasks, in flight first. Pinned lists and `watching` get their own sections. Filter matches name, list, folder, tags. |
+| Stage, middle | Rename, edit the description as markdown, tick subtasks, comment, run a timer. |
+| Properties, right | Status, priority, due, custom fields, files. Sticky while you scroll. |
+| Status bar | `open` `in flight` `blocked` `late` `done`. Each is a filter. Click again to clear. |
 
-**Stage (right)** — the open task. Rename it, rewrite its description in markdown, change status,
-priority and due date, tick subtasks off, attach files, post an update, start a timer. Custom
-fields with a value are shown, and a blocked task leads with its reason.
+## Deliberate choices
 
-**Status bar** — open, in flight, blocked, late and done counts, each one a filter: click to narrow
-the rail, click again to clear. Late and done appear only when there is something to show. Also a
-running timer with elapsed time, and a `● n changed` badge when ClickUp has moved on.
+| | |
+|---|---|
+| Nothing moves unless you move it | The 90s poll only raises a badge. New data waits for a click. |
+| Colour is which field, not which value | `dysk`, not `lsblk`. Location lavender, a person their own ClickUp colour, estimate teal, logged green, due sky until late. |
+| A proportion gets a gauge | Subtask progress is a bar. |
+| Priority shows at urgent and high only | Normal and low are noise. |
+| Sort is overdue, priority, then date | 3 of 33 tasks here carry a due date. |
+| Blocked is a state, not a field | Any custom field matching `/block/i` with text in it. Rename the field in ClickUp and this stops working. |
 
-### Things it does on purpose
+## API notes
 
-- **Nothing moves unless you move it.** Polling every 90s only raises the badge. New data waits
-  until you click it. Re-rendering under someone mid-sentence is the thing this exists to avoid.
-- **Colour says which field you are reading**, the way `dysk` colours a column rather than a
-  value. Location is always lavender, a person is always their own ClickUp colour, an estimate is
-  teal, time logged is green, a due date is sky until it is late. Learn the palette once and you
-  read the line by hue instead of by position. Status colours come from your workspace, snapped
-  to the nearest Mocha accent by hue so they sit in the palette without being invented.
-- **A proportion gets a gauge**, not a sentence. Subtask progress is a bar.
-- **Priority shows only when it's urgent or high.** Normal and low are noise.
-- **Sorted by priority, not by date.** Overdue first, then priority, then date. Almost nothing in
-  this workspace carries a due date, so leading with the date sorted on a value that is usually
-  absent.
-- **Blocked is a state, not a field.** Any custom field named like "Blocked Reason" with something
-  written in it marks the task, in the rail and at the top of the open task. Rename that field in
-  ClickUp and this stops noticing.
-- **Descriptions render as real markdown** — headings, tables, code, lists — clamped behind a fade
-  until you ask for the rest.
+Things that cost time to find.
 
-## Notes
+| | |
+|---|---|
+| `markdown_description` | Single-task fetch only. List fetches return `description` and `text_content` markdown-stripped and byte-identical to each other. |
+| Update reply | The whole task except `markdown_description`, so an edit is one request. |
+| `date_updated_gt` | Inclusive. Pass watermark + 1 or the newest task returns every time and the badge sticks. |
+| `include_closed` | Gates `closed` ("cancelled") only. `done` ("complete") always returns. |
+| Names | Stored HTML-escaped. `testimonials &amp; partners` arrives literally, so decode once before display. Status names sent back stay raw. |
+| Statuses | Belong to the list. No task payload shows one was added or recoloured, so the poll re-reads the open list. |
+| Rate limit | 100/min. A poll is one request, plus one per pinned list, plus one for the open list. |
+| Poll | Asks whether anything changed, not what. 32 bytes idle. A task unassigned from you stays on screen until you refresh. |
+| Markdown | Everything is escaped before any rule runs, so raw HTML in a description shows as text. No sanitiser dependency. |
 
-- `markdown_description` only exists on the single-task fetch. The list endpoint returns
-  `description` and `text_content` already stripped of markdown, byte-identical to each other.
-- ClickUp stores names HTML-escaped (`testimonials &amp; partners`), so names are decoded once
-  before being re-escaped for display. Status names sent *back* to the API stay raw.
-- The markdown renderer escapes everything before applying a single rule, so raw HTML in a
-  description shows as text and cannot execute. That is why there's no sanitiser dependency.
-- Statuses belong to the list, not the task, so nothing in a task payload reveals that one was
-  added or recoloured. The 90s poll re-reads the open task's list to catch it, and a refresh drops
-  every cached list definition.
-- Rate limit is 100 requests/minute on your plan. A poll costs one request, plus one per pinned
-  list, plus one for the open task's list — so a dozen pins would need rethinking.
-- The poll asks a question rather than fetching an answer: anything updated after the newest
-  thing already held. Idle, that is 32 bytes. The badge does the real fetch when clicked. The
-  cost is that a task leaving you — unassigned or deleted — is invisible until you refresh,
-  because the query filters by assignee so it simply does not come back.
-- `date_updated_gt` is inclusive despite the name, so the watermark is passed with a +1.
-- ClickUp has two finished status types and `include_closed` only gates one. A `done` status
-  ("complete") is always returned; a `closed` one ("cancelled") needs the toggle.
-- An update is answered with the whole task, so an edit is one request. Opening a task is three
-  (list, comments, task) and they are cached until you refresh.
+## Checking
 
-## Checking it
+```sh
+npm run check
+```
 
-`npm run check` runs both:
-
-`node check.mjs` evaluates `public/app.js` against a stub DOM and reports the listeners it
-registered. `node --check` only parses — it cannot see a temporal dead zone, a missing element, or
-anything else that throws at module evaluation, and one of those shipped as a blank page.
-
-`tsc --noEmit` type-checks the JavaScript in place via `checkJs`. There is no build step and no
-TypeScript in the repo: the browser loads the same `.js` it always did. `types/clickup.d.ts`
-describes the slice of the API this app touches, written from real payloads rather than the docs.
-
-`noImplicitAny` is off. Turning it on reports 184 unannotated parameters, so full coverage is a
-project rather than a flag. `server.mjs` is annotated and does pass with it on, since it is the
-part holding the token.
+- `check.mjs` evaluates `public/app.js` against a stub DOM. `node --check` only parses, and missed
+  a temporal dead zone that shipped as a blank page.
+- `tsc --noEmit` with `checkJs`. No build step, no `.ts`, the browser loads the same file.
+  `noImplicitAny` is off, and turning it on reports 184 unannotated parameters. `server.mjs` is
+  annotated and passes with it on, because it holds the token.
 
 ## Fiddling
 
-`localStorage`: `teamId` (the workspace), `pins` (the pinned lists). Clear either and reload.
+`localStorage` holds `teamId` and `pins`. Clear either and reload.
 
-From the console: `now.poll()` checks ClickUp immediately, `now.preview(3)` shows the change badge
-without touching anything.
+From the console, `now.poll()` checks ClickUp immediately and `now.preview(3)` shows the change
+badge.

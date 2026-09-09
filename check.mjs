@@ -1,6 +1,6 @@
-/* Evaluates app.js against a stub DOM. `node --check` only parses — it cannot see a
+/* Evaluates app.js against a stub DOM. `node --check` only parses, it cannot see a
    temporal dead zone, a missing element, or anything else that throws at module
-   evaluation. This actually runs the top level. */
+   evaluation. This runs the top level. */
 const listeners = [];
 const el = (id) => ({
   id,
