@@ -71,6 +71,12 @@ running timer with elapsed time; and a `● n changed` badge when ClickUp has mo
 - An update is answered with the whole task, so an edit is one request. Opening a task is three
   (list, comments, task) and they are cached until you refresh.
 
+## Checking it still boots
+
+`node check.mjs` evaluates `public/app.js` against a stub DOM and reports the listeners it
+registered. `node --check` only parses — it cannot see a temporal dead zone, a missing element, or
+anything else that throws at module evaluation, and one of those shipped as a blank page.
+
 ## Fiddling
 
 `localStorage`: `teamId` (the workspace), `pins` (the pinned lists). Clear either and reload.
