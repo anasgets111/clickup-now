@@ -184,6 +184,7 @@ const PRIOS = [
 ];
 
 const shut = (t) => t.status.type === 'done' || t.status.type === 'closed';
+const late = (t) => Boolean(t.due_date) && Number(t.due_date) < Date.now();
 
 /* Custom fields. Every task carries an entry for every field on its list, nearly all
    of them empty, so the only interesting ones are those with a value. Drop-downs store
@@ -215,6 +216,16 @@ const blockedBy = (t) => (t.custom_fields ?? []).find((f) => /block/i.test(f.nam
 
 let me, teamId, tasks = [], watched = [], picked = null, timer = null, ctx = null;
 let watermark = 0;   // newest date_updated we hold; the poll asks for anything after it
+
+/* The bar counters double as lenses. One at a time — clicking the active one clears it —
+   because two overlapping filters is a state you have to reason about rather than read. */
+let lens = null;
+const LENSES = {
+  open: (t) => !shut(t),
+  flight: (t) => t.status.type === 'custom',
+  stuck: (t) => Boolean(blockedBy(t)),
+  late,
+};
 let pins = JSON.parse(localStorage.getItem('pins') ?? '[]');
 const pool = new Map();          // pinned list id -> its tasks
 const lists = new Map();
@@ -228,7 +239,6 @@ const byId = (id) => everything().find((t) => t.id === id);
    but not here: almost nothing in this workspace carries a due date, so everything tied
    on the sentinel and fell through to priority anyway. Priority is the real signal —
    it is set on most tasks — so it leads, and a genuinely late task still jumps it. */
-const late = (t) => Boolean(t.due_date) && Number(t.due_date) < Date.now();
 const byUrgency = (a, b) =>
   Number(late(b)) - Number(late(a)) ||
   Number(a.priority?.id ?? 9) - Number(b.priority?.id ?? 9) ||
@@ -263,8 +273,10 @@ const rowOf = (t) => `<button class="row${t.id === picked ? ' on' : ''}" style="
 
 function renderRail() {
   const q = low($('#q').value.trim());
-  const hit = (t) => !q || [t.name, t.list.name, t.folder?.name, ...t.tags.map((g) => g.name)]
+  const matches = (t) => !q || [t.name, t.list.name, t.folder?.name, ...t.tags.map((g) => g.name)]
     .some((s) => s && low(unent(s)).includes(q));
+  // The typed filter and the lens compose; both have to pass.
+  const hit = (t) => matches(t) && (!lens || LENSES[lens](t));
 
   const mine = tasks.filter(hit).sort(byUrgency);
   const groups = [
@@ -289,7 +301,8 @@ function renderRail() {
       ${g.pin ? `<button class="unpin" data-unpin="${esc(g.pin)}" title="Stop showing this list">&times;</button>` : ''}</p>
     ${g.list.map(rowOf).join('') || '<p class="quiet">nothing here</p>'}</div>`);
 
-  $('#rail').innerHTML = parts.join('') || '<p class="quiet">Nothing on you right now.</p>';
+  $('#rail').innerHTML = parts.join('')
+    || `<p class="quiet">${lens || q ? 'Nothing matches that.' : 'Nothing on you right now.'}</p>`;
 }
 
 /* "late" and "today" sat here reading zero forever, because tasks in this workspace
@@ -299,11 +312,15 @@ function stats() {
   const overdue = tasks.filter(late).length;
   const flight = tasks.filter((t) => t.status.type === 'custom').length;
   const stuck = tasks.filter(blockedBy).length;
-  $('#stats').innerHTML = `
-    <span class="c-open"><i>&#9679;</i>${tasks.filter((t) => !shut(t)).length} open</span>
-    <span class="c-flight"><i>&#9680;</i>${flight} in flight</span>
-    <span class="c-stuck"><i>&#8709;</i>${stuck} blocked</span>
-    ${overdue ? `<span class="c-late"><i>&#9650;</i>${overdue} late</span>` : ''}`;
+  const lensBtn = (key, glyph, n, label) =>
+    `<button class="c-${key}" data-lens="${key}" aria-pressed="${lens === key}"
+      title="Show only ${label}"><i>${glyph}</i>${n} ${label}</button>`;
+  $('#stats').innerHTML = [
+    lensBtn('open', '&#9679;', tasks.filter((t) => !shut(t)).length, 'open'),
+    lensBtn('flight', '&#9680;', flight, 'in flight'),
+    lensBtn('stuck', '&#8709;', stuck, 'blocked'),
+    overdue ? lensBtn('late', '&#9650;', overdue, 'late') : '',
+  ].join('');
 }
 
 /* ── stage ──────────────────────────────────────────────────────── */
@@ -821,6 +838,14 @@ setInterval(() => !document.hidden && tick(), 60_000);
 // Coming back to the tab is exactly when a stale clock would be visible.
 document.addEventListener('visibilitychange', () => !document.hidden && tick());
 $('#news').addEventListener('click', reload);
+
+$('#stats').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-lens]');
+  if (!b) return;
+  lens = lens === b.dataset.lens ? null : b.dataset.lens;   // clicking the active one clears it
+  stats();
+  renderRail();
+});
 
 let typing;
 $('#q').addEventListener('input', () => { clearTimeout(typing); typing = setTimeout(renderRail, 120); });

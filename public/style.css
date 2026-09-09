@@ -70,9 +70,25 @@ body {
   box-shadow: 0 0 8px var(--mauve);
 }
 
-.stats { display: flex; gap: 1.1rem; }
-.stats i { font-style: normal; margin-right: 0.35rem; }
-.stats span { font-variant-numeric: tabular-nums; }
+/* The counters are lenses, so they have to look pressable and show which is pressed. */
+.stats { display: flex; gap: 0.35rem; }
+.stats i { font-style: normal; margin-right: 0.4rem; }
+
+.stats button {
+  padding: 0.15rem 0.6rem;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.stats button:hover { background: var(--mantle); }
+.stats button[aria-pressed='true'] {
+  background: color-mix(in srgb, currentColor 16%, transparent);
+  border-color: color-mix(in srgb, currentColor 45%, transparent);
+}
 /* Each counter keeps its colour whatever its value, so the bar is read by hue rather
    than by counting along it. A zero stays coloured; that is the point. */
 .stats .c-open   { color: var(--sky); }
