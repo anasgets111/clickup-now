@@ -225,6 +225,7 @@ const LENSES = {
   flight: (t) => t.status.type === 'custom',
   stuck: (t) => Boolean(blockedBy(t)),
   late,
+  done: shut,
 };
 let pins = JSON.parse(localStorage.getItem('pins') ?? '[]');
 const pool = new Map();          // pinned list id -> its tasks
@@ -312,6 +313,13 @@ function stats() {
   const overdue = tasks.filter(late).length;
   const flight = tasks.filter((t) => t.status.type === 'custom').length;
   const stuck = tasks.filter(blockedBy).length;
+  // ClickUp has two finished types and include_closed only gates one: a `done` status
+  // ("complete") always comes back, a `closed` one ("cancelled") does not unless the
+  // toggle is on. So this counts what is actually here, appears only when there is
+  // something to count, and a lens left pointing at nothing clears itself.
+  const done = tasks.filter(shut).length;
+  if (lens === 'done' && !done) lens = null;
+
   const lensBtn = (key, glyph, n, label) =>
     `<button class="c-${key}" data-lens="${key}" aria-pressed="${lens === key}"
       title="Show only ${label}"><i>${glyph}</i>${n} ${label}</button>`;
@@ -320,6 +328,7 @@ function stats() {
     lensBtn('flight', '&#9680;', flight, 'in flight'),
     lensBtn('stuck', '&#8709;', stuck, 'blocked'),
     overdue ? lensBtn('late', '&#9650;', overdue, 'late') : '',
+    done ? lensBtn('done', '&#10003;', done, 'done') : '',
   ].join('');
 }
 

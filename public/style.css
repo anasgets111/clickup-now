@@ -95,6 +95,7 @@ body {
 .stats .c-flight { color: var(--yellow); }
 .stats .c-stuck  { color: var(--peach); }
 .stats .c-late   { color: var(--red); }
+.stats .c-done   { color: var(--green); }
 
 .tools { display: flex; align-items: center; gap: 0.85rem; margin-left: auto; }
 

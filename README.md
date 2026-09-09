@@ -27,8 +27,9 @@ folder and tags.
 priority and due date, tick subtasks off, attach files, post an update, start a timer. Custom
 fields with a value are shown, and a blocked task leads with its reason.
 
-**Status bar** — open, in flight and blocked counts (late appears only when something is); a
-running timer with elapsed time; and a `● n changed` badge when ClickUp has moved on.
+**Status bar** — open, in flight, blocked, late and done counts, each one a filter: click to narrow
+the rail, click again to clear. Late and done appear only when there is something to show. Also a
+running timer with elapsed time, and a `● n changed` badge when ClickUp has moved on.
 
 ### Things it does on purpose
 
@@ -68,6 +69,8 @@ running timer with elapsed time; and a `● n changed` badge when ClickUp has mo
   cost is that a task leaving you — unassigned or deleted — is invisible until you refresh,
   because the query filters by assignee so it simply does not come back.
 - `date_updated_gt` is inclusive despite the name, so the watermark is passed with a +1.
+- ClickUp has two finished status types and `include_closed` only gates one. A `done` status
+  ("complete") is always returned; a `closed` one ("cancelled") needs the toggle.
 - An update is answered with the whole task, so an edit is one request. Opening a task is three
   (list, comments, task) and they are cached until you refresh.
 
