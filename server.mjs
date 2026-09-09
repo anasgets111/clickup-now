@@ -1,19 +1,25 @@
 import { createServer } from 'node:http';
+/** @import { IncomingMessage, ServerResponse } from 'node:http' */
 import { readFile } from 'node:fs/promises';
-import { extname, join, resolve, sep } from 'node:path';
+import { extname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 process.loadEnvFile();
-const TOKEN = process.env.CLICKUP_TOKEN;
-if (!TOKEN) {
-  console.error('Missing CLICKUP_TOKEN. Copy .env.example to .env and paste your token.');
+/** @param {string} why @returns {never} */
+function die(why) {
+  console.error(why);
   process.exit(1);
 }
 
+const TOKEN = process.env.CLICKUP_TOKEN
+  ?? die('Missing CLICKUP_TOKEN. Copy .env.example to .env and paste your token.');
+
 const PUBLIC = resolve(fileURLToPath(new URL('./public', import.meta.url)));
+/** @type {Record<string, string>} */
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
 const OURS = ['http://localhost:4400', 'http://127.0.0.1:4400'];
 
+/** @param {IncomingMessage} req @param {ServerResponse} res */
 async function proxy(req, res) {
   // This server holds a token that can change a whole company's workspace, and any
   // page in the browser can reach 127.0.0.1. CORS stops such a page READING a reply,
@@ -27,9 +33,10 @@ async function proxy(req, res) {
   for await (const c of req) chunks.push(c);
   // Pass the caller's content-type through rather than forcing JSON: file uploads are
   // multipart and the boundary lives in that header.
+  /** @type {Record<string, string>} */
   const headers = { Authorization: TOKEN };
   if (req.headers['content-type']) headers['content-type'] = req.headers['content-type'];
-  const r = await fetch('https://api.clickup.com/api/v2' + req.url.slice(4), {
+  const r = await fetch('https://api.clickup.com/api/v2' + (req.url ?? '').slice(4), {
     method: req.method,
     headers,
     body: chunks.length ? Buffer.concat(chunks) : undefined,
@@ -39,7 +46,10 @@ async function proxy(req, res) {
 }
 
 createServer(async (req, res) => {
-  if (req.url.startsWith('/api/')) {
+  // Node types url as optional; it is always set for a server, but reading it once
+  // means the rest of this function does not have to care.
+  const url = req.url ?? '/';
+  if (url.startsWith('/api/')) {
     // headersSent guard: if the upstream body fails mid-read the status is already
     // out, and a second writeHead would throw and take the server down.
     return proxy(req, res).catch(() => {
@@ -49,7 +59,7 @@ createServer(async (req, res) => {
   }
   let path;
   try {
-    path = decodeURIComponent(req.url.split('?')[0]);
+    path = decodeURIComponent(url.split('?')[0]);
   } catch {
     return res.writeHead(400).end('Bad path');
   }

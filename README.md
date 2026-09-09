@@ -12,7 +12,8 @@ Built because ClickUp's own list view puts a whole company's work in front of yo
 2. `cp .env.example .env` and paste the token in.
 3. `node server.mjs`, then open http://localhost:4400
 
-No dependencies, no build step, four files. Needs Node 20.12+ for `process.loadEnvFile`.
+No runtime dependencies, no build step, four files. Needs Node 20.12+ for `process.loadEnvFile`.
+`npm install` only fetches the type checker; the app itself needs nothing.
 
 The token lives in `.env` (gitignored) and never reaches the browser — `server.mjs` proxies every
 call to ClickUp and is the only thing that holds it. It binds to 127.0.0.1 only.
@@ -74,11 +75,21 @@ running timer with elapsed time, and a `● n changed` badge when ClickUp has mo
 - An update is answered with the whole task, so an edit is one request. Opening a task is three
   (list, comments, task) and they are cached until you refresh.
 
-## Checking it still boots
+## Checking it
+
+`npm run check` runs both:
 
 `node check.mjs` evaluates `public/app.js` against a stub DOM and reports the listeners it
 registered. `node --check` only parses — it cannot see a temporal dead zone, a missing element, or
 anything else that throws at module evaluation, and one of those shipped as a blank page.
+
+`tsc --noEmit` type-checks the JavaScript in place via `checkJs`. There is no build step and no
+TypeScript in the repo: the browser loads the same `.js` it always did. `types/clickup.d.ts`
+describes the slice of the API this app touches, written from real payloads rather than the docs.
+
+`noImplicitAny` is off. Turning it on reports 184 unannotated parameters, so full coverage is a
+project rather than a flag. `server.mjs` is annotated and does pass with it on, since it is the
+part holding the token.
 
 ## Fiddling
 

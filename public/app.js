@@ -87,7 +87,8 @@ function md(src) {
       }
       out.push(`<${tag}>${items.join('')}</${tag}>`);
     } else if (/^\s*#{1,6}\s/.test(ln)) {
-      const n = Math.min(ln.match(/^\s*(#+)/)[1].length + 1, 6);
+      const hashes = ln.match(/^\s*(#+)/)?.[1] ?? '#';
+      const n = Math.min(hashes.length + 1, 6);
       out.push(`<h${n}>${inline(ln.replace(/^\s*#+\s+/, ''), keep)}</h${n}>`);
       i++;
     } else if (/^\s*>\s?/.test(ln)) {
@@ -748,7 +749,7 @@ $('#rail').addEventListener('click', async (e) => {
 async function pages(path, extra = {}) {
   const out = [];
   for (let page = 0; page < 20; page++) {
-    const q = new URLSearchParams({ page, subtasks: 'true', include_closed: String($('#closed').checked), ...extra });
+    const q = new URLSearchParams({ page: String(page), subtasks: 'true', include_closed: String($('#closed').checked), ...extra });
     const { tasks: batch } = await api(`${path}?${q}`);
     out.push(...batch);
     if (batch.length < 100) break;
