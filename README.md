@@ -6,30 +6,42 @@ Catppuccin Mocha palette as the Mantle shell in `~/.config/mantle`.
 
 ## Native app
 
-Requires Mantle, Python 3, and a ClickUp personal token in `.env`:
+Requires Mantle, Python 3, `secret-tool`, and an unlocked Secret Service. Start Now and paste your
+ClickUp personal token into its protected connection field. Mantle stores it in Secret Service;
+the Lua UI never receives the token. The connected sidebar offers **Forget API token**.
 
 ```sh
-cp .env.example .env            # if you have not already made one
-# Edit .env and set CLICKUP_TOKEN
-set -a; . ./.env; set +a
 mantle -c ./mantle check         # validate the config
-mantle -c ./mantle               # run; -d starts it detached
+mantle -c ./mantle -d            # run detached
 ```
+
+`CLICKUP_TOKEN` in the environment remains supported for existing setups, but the app cannot
+forget an environment variable from inside the window. Remove it from the launch environment and
+restart to switch to the protected field.
 
 Run those commands from this repository. Mantle reads [`mantle/shell.lua`](mantle/shell.lua),
 which loads the ClickUp model, transport, and UI modules. It is a separate Mantle instance and
 does not change your regular shell. Closing the window stops that instance's supervisor, as in
-your Mantle demo. `mantle -c ./mantle log` shows runtime errors. The selected workspace and the
-closed-task setting persist in `~/.local/state/clickup-now/settings.json` (or `$XDG_STATE_HOME`).
+your Mantle demo. `mantle -c ./mantle log` shows runtime errors. The selected workspace, pinned
+lists, watching preference, and closed-task setting persist in
+`~/.local/state/clickup-now/settings.json` (or `$XDG_STATE_HOME`).
+Task data stays in Mantle's named in-memory state through Lua hot reloads; startup reuses it and
+does not refetch unless a load was interrupted. A fresh app launch fetches current data.
 
-The native app supports search, task filters, workspace selection, status and priority changes,
-today/clear due date, subtask completion, comments, and the ClickUp timer. It checks for changed
-assigned tasks every 90 seconds and waits for a manual refresh before replacing the list. The
-description renders Markdown headings, lists, links, code, and tables, collapsed by default.
-The task header stays in view while the description and activity scroll. At narrower window
-widths, **Task settings** opens below the header in its own scrollable panel.
-**Open in ClickUp** handles rich editing, attachments, and fields that Mantle's single-line text
-field cannot edit. Pinned lists and watching are currently only in the browser version below.
+The native app supports search (including tags), task filters, workspace selection, pinned lists,
+recently updated watched tasks, status and priority changes, any due date entered as `YYYY-MM-DD`,
+subtask completion, comments, and the ClickUp timer. A running timer appears in the task rail.
+Task settings show populated custom fields, attachments, tags, assignees, estimates, and creation
+date. It checks assigned, pinned, and watched tasks and the open list's statuses every 90 seconds,
+then waits for a manual refresh before replacing the list. The description renders Markdown
+headings, lists, links, code, and tables, collapsed by default. The task header stays in view while
+the document scrolls. Its **Jump to** links scroll to the
+description, subtasks, or activity. At narrower window widths, **Task settings** opens below the
+header in a two-column panel. Selection, expansion, and progress use short Mantle animations.
+Set `NOW_REDUCED_MOTION=1` before launching to disable those animations.
+**Edit markdown** opens a terminal editor (`kitty` and `nvim` by default; override with
+`NOW_TERMINAL` and `NOW_EDITOR`) and saves on successful exit. **Open in ClickUp** handles uploading
+attachments and editing field types that Mantle's single-line text field cannot edit.
 
 ## Browser version
 

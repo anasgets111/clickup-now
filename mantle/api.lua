@@ -2,14 +2,25 @@
 -- the UI and its state stay in Lua. Chunked output stays below Mantle's 64 KiB line cap.
 local M = {}
 local token = os.getenv("CLICKUP_TOKEN")
+local secret_name = "clickup-now-token"
+local stored_available = false
 M.NULL = {}
 local transport = [[
-import json, os, sys, urllib.error, urllib.request
-method, path, body = sys.argv[1:4]
+import json, os, subprocess, sys, urllib.error, urllib.request
+method, path, body, secret_name = sys.argv[1:5]
+token = os.environ.get("CLICKUP_TOKEN")
+if not token:
+    found = subprocess.run(["secret-tool", "lookup", "name", secret_name],
+                           capture_output=True, check=False)
+    token = found.stdout.decode("utf-8").rstrip("\n") if found.returncode == 0 else None
+if not token:
+    print(0)
+    print(json.dumps({"err": "No ClickUp token is saved"}))
+    sys.exit(0)
 request = urllib.request.Request(
     "https://api.clickup.com/api/v2" + path,
     data=body.encode("utf-8") if body else None,
-    headers={"Authorization": os.environ["CLICKUP_TOKEN"], "Content-Type": "application/json"},
+    headers={"Authorization": token, "Content-Type": "application/json"},
     method=method,
 )
 try:
@@ -29,7 +40,42 @@ for offset in range(0, len(payload), 32000):
 ]]
 
 function M.ready()
-	return token and token ~= ""
+	return (token and token ~= "") or stored_available
+end
+
+function M.has_env_token()
+	return token ~= nil and token ~= ""
+end
+
+function M.discover(done)
+	if M.has_env_token() then
+		done(true)
+		return
+	end
+	local found = false
+	process.run("python3", {
+		"-c",
+		[=[import subprocess, sys
+result = subprocess.run(["secret-tool", "lookup", "name", sys.argv[1]], capture_output=True, check=False)
+print("stored" if result.returncode == 0 and result.stdout.strip() else "missing")]=],
+		secret_name,
+	}, function(line, stream)
+		if stream == "stdout" and line == "stored" then
+			found = true
+		end
+	end, function()
+		stored_available = found
+		done(found)
+	end)
+end
+
+function M.forget(done)
+	process.run("secret-tool", { "clear", "name", secret_name }, function() end, function(code)
+		if code == 0 then
+			stored_available = false
+		end
+		done(code == 0)
+	end)
 end
 
 local function quote(value)
@@ -53,32 +99,37 @@ end
 
 function M.request(method, path, body, done)
 	if not M.ready() then
-		done("Set CLICKUP_TOKEN before starting Mantle")
+		done("Connect ClickUp first")
 		return
 	end
 	local output = {}
-	process.run("python3", { "-c", transport, method, path, body and M.json_object(body) or "" }, function(line, stream)
-		if stream == "stdout" then
-			output[#output + 1] = line
+	process.run(
+		"python3",
+		{ "-c", transport, method, path, body and M.json_object(body) or "", secret_name },
+		function(line, stream)
+			if stream == "stdout" then
+				output[#output + 1] = line
+			end
+		end,
+		function(code)
+			local status = tonumber(output[1])
+			table.remove(output, 1)
+			local payload = table.concat(output)
+			local data = payload ~= "" and json.decode(payload) or {}
+			if code ~= 0 or not status then
+				done("Could not reach ClickUp (request " .. tostring(code) .. ")")
+			elseif status == 0 then
+				done(type(data) == "table" and tostring(data.err) or "Could not reach ClickUp")
+			elseif status < 200 or status >= 300 then
+				local message = type(data) == "table" and (data.err or data.error) or nil
+				done("ClickUp " .. status .. (message and ": " .. tostring(message) or ""))
+			elseif type(data) ~= "table" then
+				done("ClickUp returned invalid JSON")
+			else
+				done(nil, data)
+			end
 		end
-	end, function(code)
-		local status = tonumber(output[1])
-		table.remove(output, 1)
-		local payload = table.concat(output)
-		local data = payload ~= "" and json.decode(payload) or {}
-		if code ~= 0 or not status then
-			done("Could not reach ClickUp (request " .. tostring(code) .. ")")
-		elseif status == 0 then
-			done(type(data) == "table" and tostring(data.err) or "Could not reach ClickUp")
-		elseif status < 200 or status >= 300 then
-			local message = type(data) == "table" and (data.err or data.error) or nil
-			done("ClickUp " .. status .. (message and ": " .. tostring(message) or ""))
-		elseif type(data) ~= "table" then
-			done("ClickUp returned invalid JSON")
-		else
-			done(nil, data)
-		end
-	end)
+	)
 end
 
 return M
