@@ -1,9 +1,39 @@
 # Now
 
-ClickUp tasks assigned to you. Task list left, open task right. Built because ClickUp's own list
-view puts a whole company's work on screen at once.
+A small native ClickUp window for Mantle on Wayland. Your assigned tasks sit on the left, the
+selected task and its activity in the middle, and quick edits on the right. It uses the same
+Catppuccin Mocha palette as the Mantle shell in `~/.config/mantle`.
 
-## Setup
+## Native app
+
+Requires Mantle, Python 3, and a ClickUp personal token in `.env`:
+
+```sh
+cp .env.example .env            # if you have not already made one
+# Edit .env and set CLICKUP_TOKEN
+set -a; . ./.env; set +a
+mantle -c ./mantle check         # validate the config
+mantle -c ./mantle               # run; -d starts it detached
+```
+
+Run those commands from this repository. Mantle reads [`mantle/shell.lua`](mantle/shell.lua),
+which loads the ClickUp model, transport, and UI modules. It is a separate Mantle instance and
+does not change your regular shell. Closing the window stops that instance's supervisor, as in
+your Mantle demo. `mantle -c ./mantle log` shows runtime errors. The selected workspace and the
+closed-task setting persist in `~/.local/state/clickup-now/settings.json` (or `$XDG_STATE_HOME`).
+
+The native app supports search, task filters, workspace selection, status and priority changes,
+today/clear due date, subtask completion, comments, and the ClickUp timer. It checks for changed
+assigned tasks every 90 seconds and waits for a manual refresh before replacing the list. The
+description renders Markdown headings, lists, links, code, and tables, collapsed by default.
+The task header stays in view while the description and activity scroll. At narrower window
+widths, **Task settings** opens below the header in its own scrollable panel.
+**Open in ClickUp** handles rich editing, attachments, and fields that Mantle's single-line text
+field cannot edit. Pinned lists and watching are currently only in the browser version below.
+
+## Browser version
+
+### Setup
 
 ```sh
 cp .env.example .env   # paste a personal token: ClickUp avatar, Settings, Apps
